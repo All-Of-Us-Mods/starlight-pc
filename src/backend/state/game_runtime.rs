@@ -1,17 +1,30 @@
 use crate::backend::error::{AppError, AppResult};
-use crate::backend::services::profile_service;
+use crate::backend::services::{profile_instance_service, profile_service};
 use log::{debug, error, info, warn};
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
+use std::path::PathBuf;
 use std::process::Child;
 #[cfg(target_os = "linux")]
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{LazyLock, Mutex};
 use std::time::{Duration, Instant};
 
+/// Which directory a modded launch runs from. Slot 0 is the profile directory
+/// itself; higher slots are throwaway copies made by
+/// [`profile_instance_service`] so concurrent launches of the same profile
+/// don't share BepInEx state. `temporary_dir` is set for those copies and
+/// deleted once the instance exits.
+#[derive(Default)]
+pub struct LaunchInstance {
+    pub slot: usize,
+    pub temporary_dir: Option<PathBuf>,
+}
+
 struct TrackedGameProcess {
     child: Child,
     profile_id: Option<String>,
     launched_at: Instant,
+    instance: LaunchInstance,
 }
 
 /// A game handed off to the Steam client (`steam -applaunch`). Steam reparents
@@ -88,15 +101,25 @@ fn reap_process(mut child: Child) {
     }
 }
 
-/// Reap a tracked process and record its session against the owning profile.
+/// Reap a tracked process, record its session against the owning profile, and
+/// drop the instance copy it ran from (if any).
 fn reap_and_record(tracked: TrackedGameProcess) {
     let TrackedGameProcess {
         child,
         profile_id,
         launched_at,
+        instance,
     } = tracked;
     reap_process(child);
     record_play_time(profile_id, launched_at);
+    release_instance_dir(instance.temporary_dir);
+}
+
+/// Delete a finished instance's throwaway copy off the caller's thread — it's
+/// a recursive delete of a profile-sized directory.
+fn release_instance_dir(directory: Option<PathBuf>) {
+    let Some(directory) = directory else { return };
+    std::thread::spawn(move || profile_instance_service::release(&directory));
 }
 
 /// Persist a play session against the owning profile. Offloaded to a detached
@@ -243,7 +266,47 @@ fn mark_launched(profile_id: Option<&str>) {
     }
 }
 
-pub fn register_launched_process(child: Child, profile_id: Option<String>) -> AppResult<()> {
+/// Launch slots currently taken by running instances of `profile_id`. The
+/// launch path picks the lowest free slot so a new instance never reuses the
+/// directory of a live one. Instances we can't attribute to a directory (Xbox
+/// UWP, Steam-launched) always run from the profile itself, i.e. slot 0.
+pub fn used_instance_slots(profile_id: &str) -> HashSet<usize> {
+    let mut state = TRACKED_STATE.lock().unwrap_or_else(|e| e.into_inner());
+    prune_finished_processes(&mut state);
+
+    let mut slots: HashSet<usize> = state
+        .processes
+        .iter()
+        .filter(|tracked| tracked.profile_id.as_deref() == Some(profile_id))
+        .map(|tracked| tracked.instance.slot)
+        .collect();
+
+    if state
+        .uwp_instances
+        .iter()
+        .flatten()
+        .any(|id| id == profile_id)
+    {
+        slots.insert(0);
+    }
+
+    #[cfg(target_os = "linux")]
+    if state
+        .steam_instances
+        .iter()
+        .any(|inst| inst.profile_id.as_deref() == Some(profile_id))
+    {
+        slots.insert(0);
+    }
+
+    slots
+}
+
+pub fn register_launched_process(
+    child: Child,
+    profile_id: Option<String>,
+    instance: LaunchInstance,
+) -> AppResult<()> {
     mark_launched(profile_id.as_deref());
 
     let process_id: u32;
@@ -259,6 +322,7 @@ pub fn register_launched_process(child: Child, profile_id: Option<String>) -> Ap
             child,
             profile_id,
             launched_at: Instant::now(),
+            instance,
         });
         emit_state_snapshot(&state);
     }

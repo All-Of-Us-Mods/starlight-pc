@@ -142,18 +142,6 @@ fn patch_multi_instance(value: bool, cx: &mut App) {
     );
 }
 
-fn patch_multi_instance_delay(value: SharedString, cx: &mut App) {
-    if let Ok(secs) = value.trim().parse::<u64>() {
-        app_settings::update(
-            cx,
-            AppSettingsPatch {
-                multi_instance_launch_delay_secs: Some(secs),
-                ..Default::default()
-            },
-        );
-    }
-}
-
 fn patch_cache_bepinex(value: bool, cx: &mut App) {
     app_settings::update(
         cx,
@@ -594,7 +582,7 @@ impl Render for SettingsView {
             .default_open(true)
             .groups(game_groups);
 
-        let mut launch_items = vec![
+        let launch_items = vec![
             SettingItem::new(
                 "Close Starlight when launching",
                 SettingField::switch(
@@ -610,28 +598,12 @@ impl Render for SettingsView {
                     patch_multi_instance,
                 ),
             )
-            .description("Permit launching more than one game window at a time."),
+            .description(
+                "Permit launching more than one game window at a time. Extra instances run \
+                 from a temporary copy of the profile, so they can start right away without \
+                 clashing over BepInEx files.",
+            ),
         ];
-        if app_settings::get(cx).allow_multi_instance_launch {
-            launch_items.push(
-                stacked_item(
-                    "Launch delay between instances (seconds)",
-                    SettingField::input(
-                        |cx| {
-                            app_settings::get(cx)
-                                .multi_instance_launch_delay_secs
-                                .to_string()
-                                .into()
-                        },
-                        patch_multi_instance_delay,
-                    ),
-                )
-                .description(
-                    "When launching several instances at once, wait this long after each \
-                     so the first can warm up before the next starts.",
-                ),
-            );
-        }
         let launch_page = SettingPage::new("Launch")
             .group(SettingGroup::new().title("Behavior").items(launch_items));
 

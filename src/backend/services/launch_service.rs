@@ -1,28 +1,28 @@
 use crate::backend::error::{AppError, AppResult};
 use crate::backend::services::core_service;
+use crate::backend::services::profile_instance_service;
 use crate::backend::services::profile_service::ProfileEntry;
 #[cfg(windows)]
 use crate::backend::services::xbox_service;
-use crate::backend::state::game_runtime;
+use crate::backend::state::game_runtime::{self, LaunchInstance};
 use log::{debug, info};
 use serde::Deserialize;
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
-/// Serializes modded launches. Held across prep + spawn and then for the
-/// per-launch settle delay afterwards, so a second launch fired in quick
-/// succession queues behind the first instead of racing it. Among Us + BepInEx (IL2CPP)
-/// write shared state in the profile dir (cache/interop) during startup, so a
-/// second instance that starts mid-warm-up dies. Waiting until the first is up
-/// — the manual "launch, wait for the console, launch again" workaround — is
-/// what this automates.
+/// Serializes modded launches from prep through spawn, so two launches fired
+/// in quick succession can't pick the same instance slot or race each other's
+/// preparation of the shared game directory. Instances themselves don't wait
+/// for each other: each extra concurrent launch of a profile runs from its own
+/// copy of the profile (see [`profile_instance_service`]), which is what keeps
+/// the BepInEx state they'd otherwise fight over separate.
 static LAUNCH_LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
 
 /// Per-profile cancellation counter. A queued launch records the value when it
 /// starts waiting on [`LAUNCH_LOCK`]; if [`cancel_pending_launches`] has bumped
 /// it by the time the lock is acquired, the launch aborts instead of spawning.
-/// Lets the Stop button cancel launches still sitting in the settle queue.
+/// Lets the Stop button cancel launches still waiting to be prepared.
 static CANCEL_GENERATIONS: std::sync::LazyLock<
     std::sync::Mutex<std::collections::HashMap<String, u64>>,
 > = std::sync::LazyLock::new(|| std::sync::Mutex::new(std::collections::HashMap::new()));
@@ -72,15 +72,16 @@ pub enum LinuxRunner {
 pub struct LaunchModdedArgs {
     pub game_exe: String,
     pub profile_id: String,
-    #[cfg(any(windows, target_os = "linux"))]
     pub profile_path: String,
     pub bepinex_dll: String,
     pub dotnet_dir: String,
     pub coreclr_path: String,
     pub platform: String,
-    /// Seconds to hold the launch lock after spawning so a queued next launch
-    /// waits for this instance to warm up. 0 disables the wait.
-    pub settle_delay_secs: u64,
+    /// Whether an already-running instance of this profile may push this
+    /// launch onto its own copy of the profile directory. Off when
+    /// multi-instance launching is disabled — then a second launch just runs
+    /// from the profile like the first.
+    pub allow_instance_copy: bool,
     #[cfg(target_os = "linux")]
     pub runner: LinuxRunner,
 }
@@ -250,7 +251,11 @@ fn ensure_xbox_app_id(settings: &core_service::AppSettings) -> AppResult<String>
     Ok(app_id)
 }
 
-fn launch_process(mut cmd: Command, profile_id: Option<String>) -> AppResult<()> {
+fn launch_process(
+    mut cmd: Command,
+    profile_id: Option<String>,
+    instance: LaunchInstance,
+) -> AppResult<()> {
     #[cfg(target_os = "linux")]
     {
         use std::os::unix::process::CommandExt;
@@ -259,7 +264,44 @@ fn launch_process(mut cmd: Command, profile_id: Option<String>) -> AppResult<()>
     let child = cmd
         .spawn()
         .map_err(|e| AppError::process(format!("Failed to launch game: {e}")))?;
-    game_runtime::register_launched_process(child, profile_id)
+    game_runtime::register_launched_process(child, profile_id, instance)
+}
+
+/// Pick the directory this launch runs from: the profile itself when no
+/// instance of it is running, otherwise a fresh copy in the lowest free slot.
+/// Runs under [`LAUNCH_LOCK`] so concurrent launches can't claim the same slot.
+fn prepare_launch_dir(args: &LaunchModdedArgs) -> AppResult<(PathBuf, LaunchInstance)> {
+    let profile_dir = PathBuf::from(&args.profile_path);
+    if !args.allow_instance_copy {
+        return Ok((profile_dir, LaunchInstance::default()));
+    }
+
+    let used = game_runtime::used_instance_slots(&args.profile_id);
+    let slot = (0..).find(|slot| !used.contains(slot)).expect("free slot");
+    if slot == 0 {
+        return Ok((profile_dir, LaunchInstance::default()));
+    }
+
+    let copy = profile_instance_service::create(&args.profile_id, &profile_dir, slot)?;
+    Ok((
+        copy.clone(),
+        LaunchInstance {
+            slot,
+            temporary_dir: Some(copy),
+        },
+    ))
+}
+
+/// Rebase a path that sits inside the profile directory onto the directory
+/// this launch actually runs from (an instance copy mirrors the profile's
+/// layout, so the tail of the path is unchanged).
+fn rebase_into_launch_dir(path: &str, profile_dir: &Path, launch_dir: &Path) -> String {
+    Path::new(path)
+        .strip_prefix(profile_dir)
+        .map(|tail| launch_dir.join(tail))
+        .unwrap_or_else(|_| PathBuf::from(path))
+        .to_string_lossy()
+        .to_string()
 }
 
 /// Among Us' Steam app id.
@@ -354,12 +396,7 @@ fn launch_modded_via_steam(args: &LaunchModdedArgs, game_dir: &Path) -> AppResul
         .env("WINEDLLOVERRIDES", "winhttp=n,b");
     spawn_steam(cmd)?;
 
-    game_runtime::register_steam_launch(Some(args.profile_id.clone()))?;
-
-    if args.settle_delay_secs > 0 {
-        std::thread::sleep(std::time::Duration::from_secs(args.settle_delay_secs));
-    }
-    Ok(())
+    game_runtime::register_steam_launch(Some(args.profile_id.clone()))
 }
 
 pub fn launch_modded(args: LaunchModdedArgs) -> AppResult<()> {
@@ -370,7 +407,7 @@ pub fn launch_modded(args: LaunchModdedArgs) -> AppResult<()> {
         .ok_or_else(|| AppError::validation("Invalid game path"))?
         .to_path_buf();
 
-    // Hold the launch lock from prep through spawn + settle (see LAUNCH_LOCK).
+    // Hold the launch lock from prep through spawn (see LAUNCH_LOCK).
     let cancel_gen = cancel_generation(&args.profile_id);
     let _launch_guard = LAUNCH_LOCK.lock().unwrap_or_else(|e| e.into_inner());
     if cancel_generation(&args.profile_id) != cancel_gen {
@@ -380,17 +417,63 @@ pub fn launch_modded(args: LaunchModdedArgs) -> AppResult<()> {
 
     // Steam runner: let the Steam client launch the game so online play
     // (Steamworks) and audio (Steam Linux Runtime) work, injecting via
-    // doorstop_config.ini instead of command-line args.
+    // doorstop_config.ini instead of command-line args. Steam only ever runs
+    // one instance, so this path never uses an instance copy.
     #[cfg(target_os = "linux")]
     if matches!(args.runner, LinuxRunner::Steam) {
         return launch_modded_via_steam(&args, &game_dir);
     }
 
+    // Second and later concurrent launches of this profile run from their own
+    // copy of it, so the instances don't fight over BepInEx's cache/interop.
+    let profile_dir = PathBuf::from(&args.profile_path);
+    let (launch_dir, instance) = prepare_launch_dir(&args)?;
+    let bepinex_dll = rebase_into_launch_dir(&args.bepinex_dll, &profile_dir, &launch_dir);
+    let dotnet_dir = rebase_into_launch_dir(&args.dotnet_dir, &profile_dir, &launch_dir);
+    let coreclr_path = rebase_into_launch_dir(&args.coreclr_path, &profile_dir, &launch_dir);
+    let launch_dir_str = launch_dir.to_string_lossy().to_string();
+
+    // An instance copy is only useful to the process it was made for: drop it
+    // again if the spawn fails.
+    let copy_to_clean_up = instance.temporary_dir.clone();
+    let result = spawn_modded(
+        &args,
+        &game_dir,
+        &launch_dir_str,
+        LaunchPaths {
+            bepinex_dll,
+            dotnet_dir,
+            coreclr_path,
+        },
+        instance,
+    );
+    if result.is_err()
+        && let Some(directory) = &copy_to_clean_up
+    {
+        profile_instance_service::release(directory);
+    }
+    result
+}
+
+/// Doorstop paths, already rebased onto the directory the launch runs from.
+struct LaunchPaths {
+    bepinex_dll: String,
+    dotnet_dir: String,
+    coreclr_path: String,
+}
+
+fn spawn_modded(
+    args: &LaunchModdedArgs,
+    game_dir: &Path,
+    launch_dir: &str,
+    paths: LaunchPaths,
+    instance: LaunchInstance,
+) -> AppResult<()> {
     #[cfg(windows)]
-    set_dll_directory(&args.profile_path)?;
+    set_dll_directory(launch_dir)?;
 
     #[cfg(target_os = "linux")]
-    prepare_linux_winhttp_proxy(&game_dir, &args.profile_path)?;
+    prepare_linux_winhttp_proxy(game_dir, launch_dir)?;
 
     let mut cmd = build_game_command(
         &args.game_exe,
@@ -399,21 +482,21 @@ pub fn launch_modded(args: LaunchModdedArgs) -> AppResult<()> {
     )?;
 
     #[cfg(target_os = "linux")]
-    let bepinex_dll = to_wine_path(&args.bepinex_dll);
+    let bepinex_dll = to_wine_path(&paths.bepinex_dll);
     #[cfg(not(target_os = "linux"))]
-    let bepinex_dll = args.bepinex_dll.clone();
+    let bepinex_dll = paths.bepinex_dll;
 
     #[cfg(target_os = "linux")]
-    let dotnet_dir = to_wine_path(&args.dotnet_dir);
+    let dotnet_dir = to_wine_path(&paths.dotnet_dir);
     #[cfg(not(target_os = "linux"))]
-    let dotnet_dir = args.dotnet_dir.clone();
+    let dotnet_dir = paths.dotnet_dir;
 
     #[cfg(target_os = "linux")]
-    let coreclr_path = to_wine_path(&args.coreclr_path);
+    let coreclr_path = to_wine_path(&paths.coreclr_path);
     #[cfg(not(target_os = "linux"))]
-    let coreclr_path = args.coreclr_path.clone();
+    let coreclr_path = paths.coreclr_path;
 
-    cmd.current_dir(&game_dir)
+    cmd.current_dir(game_dir)
         .args(["--doorstop-enabled", "true"])
         .args(["--doorstop-target-assembly", &bepinex_dll])
         .args(["--doorstop-clr-corlib-dir", &dotnet_dir])
@@ -425,15 +508,7 @@ pub fn launch_modded(args: LaunchModdedArgs) -> AppResult<()> {
     }
 
     attach_epic_launch_args(&mut cmd, &args.platform)?;
-    let result = launch_process(cmd, Some(args.profile_id));
-
-    // Keep the lock for the settle window after a successful spawn so the next
-    // queued launch waits for this instance to warm up the shared state.
-    if result.is_ok() && args.settle_delay_secs > 0 {
-        std::thread::sleep(std::time::Duration::from_secs(args.settle_delay_secs));
-    }
-
-    result
+    launch_process(cmd, Some(args.profile_id.clone()), instance)
 }
 
 pub fn launch_vanilla(args: LaunchVanillaArgs) -> AppResult<()> {
@@ -471,7 +546,7 @@ pub fn launch_vanilla(args: LaunchVanillaArgs) -> AppResult<()> {
         .args(["--doorstop-enabled", "false"]);
 
     attach_epic_launch_args(&mut cmd, &args.platform)?;
-    launch_process(cmd, None)
+    launch_process(cmd, None, LaunchInstance::default())
 }
 
 /// Self-contained vanilla launch: reads app settings, resolves the game
@@ -632,24 +707,17 @@ pub fn launch_modded_for_profile(profile: ProfileEntry) -> AppResult<()> {
     #[cfg(target_os = "linux")]
     let runner = build_linux_runner_from_settings(&settings)?;
 
-    // Only wait between launches when multiple instances are allowed — that's
-    // the only time a second launch can be queued behind this one.
-    let settle_delay_secs = if settings.allow_multi_instance_launch {
-        settings.multi_instance_launch_delay_secs
-    } else {
-        0
-    };
-
     launch_modded(LaunchModdedArgs {
         game_exe: game_exe.to_string_lossy().to_string(),
         profile_id: profile.id.clone(),
-        #[cfg(any(windows, target_os = "linux"))]
         profile_path: profile.path.clone(),
         bepinex_dll: bepinex_dll.to_string_lossy().to_string(),
         dotnet_dir: dotnet_dir.to_string_lossy().to_string(),
         coreclr_path: coreclr_path.to_string_lossy().to_string(),
         platform,
-        settle_delay_secs,
+        // A launch that lands on an already-running profile only gets its own
+        // copy of it when multiple instances are allowed.
+        allow_instance_copy: settings.allow_multi_instance_launch,
         #[cfg(target_os = "linux")]
         runner,
     })

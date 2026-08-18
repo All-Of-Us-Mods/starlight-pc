@@ -64,9 +64,9 @@ pub struct LibraryDetailView {
     running_count: usize,
     stoppable_count: usize,
     /// Launches the user has requested but that haven't shown up in a backend
-    /// GameStateChanged yet (launches are serialized + settle-delayed, so a
-    /// queued one can take several seconds to spawn). Added on top of the
-    /// backend count so the UI reflects the click immediately.
+    /// GameStateChanged yet (launches are serialized, and one that needs its
+    /// own copy of the profile spends a moment preparing it). Added on top of
+    /// the backend count so the UI reflects the click immediately.
     pending_launches: usize,
     log_panel: Entity<LogPanel>,
     /// API-resolved display names per mod_id, populated lazily after load.
@@ -381,8 +381,8 @@ impl LibraryDetailView {
     fn stop(&mut self, cx: &mut Context<Self>) {
         let id = self.profile_id.clone();
         self.launch_error = None;
-        // Drop any launches still queued behind the settle delay, both in the
-        // UI and in the backend so they abort instead of spawning.
+        // Drop any launches still waiting to be prepared, both in the UI and
+        // in the backend so they abort instead of spawning.
         self.pending_launches = 0;
         cx.notify();
         cx.spawn(async move |this, cx| {
