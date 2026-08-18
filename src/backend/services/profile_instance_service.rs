@@ -41,6 +41,11 @@ const LINKABLE_SUBTREES: [&str; 4] = [
 /// copied back out to the source profile when the instance is released.
 const LOG_FILE_PREFIX: &str = "LogOutput";
 
+/// Serializes the startup sweep against copy creation. The sweep deletes every
+/// directory it finds under the instances root, so it must not run while a
+/// launch is filling one in.
+static INSTANCES_ROOT_LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
+
 fn instances_root() -> AppResult<PathBuf> {
     let dir = directories::app_data_dir()?.join(INSTANCES_DIR_NAME);
     fs::create_dir_all(&dir)?;
@@ -55,6 +60,10 @@ fn instance_dir(profile_id: &str, slot: usize) -> AppResult<PathBuf> {
 /// left there, and return the copy's path. The caller launches from it and is
 /// responsible for handing it to [`release`] once the instance exits.
 pub fn create(profile_id: &str, profile_path: &Path, slot: usize) -> AppResult<PathBuf> {
+    let _guard = INSTANCES_ROOT_LOCK
+        .lock()
+        .unwrap_or_else(|e| e.into_inner());
+
     let destination = instance_dir(profile_id, slot)?;
     if destination.exists() {
         fs::remove_dir_all(&destination)?;
@@ -86,8 +95,14 @@ pub fn release(directory: &Path) {
 
 /// Drop every instance copy on disk. Instance copies only stay valid for the
 /// lifetime of the process that launched from them, so anything present at
-/// startup is a leftover from a crash.
+/// startup is a leftover from a crash. Runs under [`INSTANCES_ROOT_LOCK`] so a
+/// launch that starts while the sweep is still going can't have its copy
+/// deleted out from under it.
 pub fn cleanup_stale_copies() {
+    let _guard = INSTANCES_ROOT_LOCK
+        .lock()
+        .unwrap_or_else(|e| e.into_inner());
+
     let Ok(root) = instances_root() else { return };
     let Ok(entries) = fs::read_dir(&root) else {
         return;
@@ -102,7 +117,11 @@ pub fn cleanup_stale_copies() {
 
 fn clone_tree(source: &Path, destination: &Path, relative: &Path) -> AppResult<()> {
     fs::create_dir_all(destination)?;
-    for entry in fs::read_dir(source)?.flatten() {
+    // Every entry error is fatal: a copy that silently dropped a plugin or a
+    // runtime file would launch and then fail in ways that look like a broken
+    // profile.
+    for entry in fs::read_dir(source)? {
+        let entry = entry?;
         let name = entry.file_name();
         let path = entry.path();
         let child_relative = relative.join(&name);
