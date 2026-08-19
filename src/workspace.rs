@@ -15,7 +15,7 @@ use crate::views::home::HomeView;
 use crate::views::library::{LibraryEvent, LibraryView};
 use crate::views::library_detail::{LibraryDetailEvent, LibraryDetailView};
 use crate::views::lobbies::LobbiesView;
-use crate::views::mod_detail::ModDetailView;
+use crate::views::mod_detail::{ModDetailEvent, ModDetailView};
 use crate::views::news_detail::NewsDetailView;
 use crate::views::servers::ServersView;
 use crate::views::settings::SettingsView;
@@ -136,18 +136,22 @@ impl Workspace {
         let settings = cx.new(SettingsView::new);
         let initial = game_runtime::current_state();
 
-        cx.subscribe(
+        cx.subscribe_in(
             &home,
-            |this, _, ev: &crate::views::home::HomeEvent, cx| match ev {
-                crate::views::home::HomeEvent::OpenMod(id) => this.open_mod(id.clone(), cx),
+            window,
+            |this, _, ev: &crate::views::home::HomeEvent, window, cx| match ev {
+                crate::views::home::HomeEvent::OpenMod(id) => this.open_mod(id.clone(), window, cx),
                 crate::views::home::HomeEvent::OpenNews(post) => this.open_news(post.clone(), cx),
             },
         )
         .detach();
-        cx.subscribe(
+        cx.subscribe_in(
             &explore,
-            |this, _, ev: &crate::views::explore::ExploreEvent, cx| match ev {
-                crate::views::explore::ExploreEvent::OpenMod(id) => this.open_mod(id.clone(), cx),
+            window,
+            |this, _, ev: &crate::views::explore::ExploreEvent, window, cx| match ev {
+                crate::views::explore::ExploreEvent::OpenMod(id) => {
+                    this.open_mod(id.clone(), window, cx)
+                }
             },
         )
         .detach();
@@ -795,10 +799,20 @@ impl Workspace {
         }
     }
 
-    fn open_mod(&mut self, mod_id: String, cx: &mut Context<Self>) {
+    fn open_mod(&mut self, mod_id: String, window: &mut Window, cx: &mut Context<Self>) {
         let detail = cx.new(|cx| ModDetailView::new(mod_id, cx));
         // Re-render the title bar when the mod finishes loading (title updates).
         cx.observe(&detail, |_, _, cx| cx.notify()).detach();
+        cx.subscribe_in(
+            &detail,
+            window,
+            |this, _, ev: &ModDetailEvent, window, cx| match ev {
+                ModDetailEvent::OpenProfile(profile_id) => {
+                    this.open_profile(profile_id.clone(), window, cx)
+                }
+            },
+        )
+        .detach();
         self.navigate(Page::ModDetail(detail), cx);
     }
 

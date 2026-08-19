@@ -32,6 +32,13 @@ pub struct ModDetailView {
     install: Option<InstallPanel>,
 }
 
+pub enum ModDetailEvent {
+    /// An install finished into a profile it created — open that profile.
+    OpenProfile(String),
+}
+
+impl EventEmitter<ModDetailEvent> for ModDetailView {}
+
 enum LoadState {
     Loading,
     Loaded(Box<ModDetailData>),
@@ -443,6 +450,10 @@ impl ModDetailView {
                             panel.status = InstallStatus::Done;
                         }
                         this.profiles = profile_service::get_profiles().unwrap_or_default();
+                        // Installing into a fresh profile lands the user on it.
+                        if creates_profile {
+                            cx.emit(ModDetailEvent::OpenProfile(profile_id));
+                        }
                     }
                     Err(e) => {
                         warn!("install_mods_for_profile failed: {e}");
