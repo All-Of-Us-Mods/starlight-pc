@@ -19,6 +19,9 @@ use crate::backend::directories;
 
 const PORT_FILE: &str = "instance.port";
 const GREETING: &str = "STARLIGHT v1";
+/// Written back once the primary has accepted a message, so the secondary can
+/// tell delivery from a message that was dropped on the floor.
+const ACK: &str = "OK";
 const IO_TIMEOUT: Duration = Duration::from_millis(500);
 
 pub enum Instance {
@@ -31,26 +34,33 @@ pub enum Instance {
 }
 
 /// What a secondary instance asks the primary to do.
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum Message {
-    /// Launch this profile (from a `starlight://profile/{id}` deep link).
-    OpenProfile(String),
+    /// A `starlight://` URL to handle, forwarded verbatim — the primary parses
+    /// it with [`crate::backend::deeplink`], so new link kinds need no changes
+    /// to this protocol.
+    DeepLink(String),
     /// No payload — just bring the window to the front.
     Activate,
 }
 
 /// Decide whether this process is the primary instance. If a primary is
-/// already running, forward `deep_link_profile` (or an activate request) to
-/// it and return [`Instance::Forwarded`].
-pub fn acquire(deep_link_profile: Option<&str>) -> Instance {
+/// already running, forward `request` (or an activate request) to it and
+/// return [`Instance::Forwarded`].
+pub fn acquire(request: Option<Message>) -> Instance {
     if let Some(mut stream) = connect_to_primary() {
-        let message = match deep_link_profile {
-            Some(id) => format!("open {id}\n"),
-            None => "activate\n".to_string(),
+        let line = match &request {
+            Some(Message::DeepLink(url)) => format!("link {url}"),
+            Some(Message::Activate) | None => "activate".to_string(),
         };
-        if stream.write_all(message.as_bytes()).is_ok() && stream.flush().is_ok() {
+        // Only a confirmed message counts as forwarded. Without the ack the
+        // primary may have dropped it (or died mid-handshake), and exiting
+        // then would lose the deep link entirely — so fall through and take
+        // over as primary instead.
+        if send(&mut stream, &line) {
             return Instance::Forwarded;
         }
+        warn!("running instance did not acknowledge '{line}'; starting a new one");
     }
 
     match TcpListener::bind((Ipv4Addr::LOCALHOST, 0)) {
@@ -71,6 +81,21 @@ pub fn acquire(deep_link_profile: Option<&str>) -> Instance {
             Instance::Primary(None)
         }
     }
+}
+
+/// Send one message and wait for the primary's [`ACK`]. `false` means the
+/// message wasn't delivered: the write failed, the primary didn't recognize
+/// the line, or it went away before answering.
+fn send(stream: &mut TcpStream, line: &str) -> bool {
+    if stream
+        .write_all(format!("{line}\n").as_bytes())
+        .and_then(|()| stream.flush())
+        .is_err()
+    {
+        return false;
+    }
+    let mut ack = String::new();
+    BufReader::new(stream).read_line(&mut ack).is_ok() && ack.trim() == ACK
 }
 
 /// Connect to the recorded primary and verify it greets like Starlight.
@@ -114,10 +139,20 @@ pub fn serve(listener: TcpListener, on_message: impl Fn(Message) + Send + 'stati
                     continue;
                 }
                 let line = line.trim();
-                if let Some(id) = line.strip_prefix("open ") {
-                    on_message(Message::OpenProfile(id.to_string()));
+                let understood = if let Some(url) = line.strip_prefix("link ") {
+                    on_message(Message::DeepLink(url.to_string()));
+                    true
                 } else if line == "activate" {
                     on_message(Message::Activate);
+                    true
+                } else {
+                    warn!("ignoring unknown message from another instance: {line}");
+                    false
+                };
+                // The secondary waits for this before it exits; leaving it
+                // unsent is what tells it the message didn't land.
+                if understood {
+                    let _ = stream.write_all(format!("{ACK}\n").as_bytes());
                 }
             }
         })

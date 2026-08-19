@@ -17,7 +17,7 @@ use crate::backend::error::{AppError, AppResult};
 const STATIC_HTTP_TYPE: &str = "StaticHttpRegionInfo, Assembly-CSharp";
 /// `TranslateName` for user-added regions — the id the modded servers use, so
 /// Among Us shows the region's literal `Name`.
-const CUSTOM_TRANSLATE_NAME: i64 = 1003;
+pub const CUSTOM_TRANSLATE_NAME: i64 = 1003;
 
 /// Among Us' region list (`regionInfo.json`).
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -302,8 +302,16 @@ pub fn add_server_region(server: &Server) -> AppResult<bool> {
 }
 
 /// Add a user-provided server as a region, normalizing the address to a bare
-/// host. No-op (returns `false`) if a region already targets the same host:port.
-pub fn add_custom_region(name: &str, address: &str, port: u16, dtls: bool) -> AppResult<bool> {
+/// host. `translate_name` is [`CUSTOM_TRANSLATE_NAME`] for anything the user
+/// adds by hand; deep links may carry their own. No-op (returns `false`) if a
+/// region already targets the same host:port.
+pub fn add_custom_region(
+    name: &str,
+    address: &str,
+    port: u16,
+    dtls: bool,
+    translate_name: i64,
+) -> AppResult<bool> {
     let host = host_of(address.trim());
     let mut info = read_region_info()?;
     if info
@@ -313,13 +321,8 @@ pub fn add_custom_region(name: &str, address: &str, port: u16, dtls: bool) -> Ap
     {
         return Ok(false);
     }
-    info.regions.push(build_region(
-        name.trim(),
-        host,
-        port,
-        dtls,
-        CUSTOM_TRANSLATE_NAME,
-    ));
+    info.regions
+        .push(build_region(name.trim(), host, port, dtls, translate_name));
     write_region_info(&info)?;
     Ok(true)
 }

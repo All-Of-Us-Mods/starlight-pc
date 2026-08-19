@@ -7,6 +7,7 @@
 use async_broadcast::{InactiveReceiver, Receiver, Sender, broadcast};
 use std::sync::LazyLock;
 
+use crate::backend::deeplink::DeepLink;
 use crate::backend::services::bepinex_service::BepInExProgress;
 use crate::backend::services::mod_download_service::ModDownloadProgress;
 use crate::backend::services::profile_service::ZipProgress;
@@ -25,6 +26,9 @@ pub enum BackendEvent {
     /// A second app instance forwarded its startup to us (single-instance
     /// guard) — bring the main window to the front.
     ActivateWindow,
+    /// A `starlight://` deep link that needs the UI — opening a page, adding a
+    /// server. Backend-only links (launching a profile) never reach the bus.
+    DeepLink(DeepLink),
 }
 
 const CHANNEL_CAPACITY: usize = 256;

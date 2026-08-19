@@ -4,28 +4,13 @@
 //! to the desktop, and the scheme is registered per-user under
 //! `HKCU\Software\Classes` so no elevation is needed. Opening the shortcut
 //! makes the shell start the app with the URL as its first argument, which
-//! `main` picks up via [`parse_profile_deep_link`] to auto-launch the profile.
-
-pub const DEEP_LINK_SCHEME: &str = "starlight";
-pub const PROFILE_LINK_HOST: &str = "profile";
-
-/// Extract the profile id from a `starlight://profile/{id}` deep link, as
-/// passed in argv when the shell opens the registered scheme.
-pub fn parse_profile_deep_link(arg: &str) -> Option<String> {
-    let prefix = format!("{DEEP_LINK_SCHEME}://{PROFILE_LINK_HOST}/");
-    let rest = arg.strip_prefix(&prefix)?;
-    let id = rest.trim_end_matches('/');
-    if id.is_empty() || id.contains('/') {
-        return None;
-    }
-    let id = urlencoding::decode(id).ok()?.trim().to_string();
-    (!id.is_empty()).then_some(id)
-}
+//! `main` routes through [`crate::backend::deeplink`] to auto-launch the
+//! profile.
 
 #[cfg(windows)]
 mod windows_impl {
-    use super::{DEEP_LINK_SCHEME, PROFILE_LINK_HOST};
     use crate::backend::api;
+    use crate::backend::deeplink::{SCHEME as DEEP_LINK_SCHEME, profile_launch_url};
     use crate::backend::error::{AppError, AppResult};
     use crate::backend::services::profile_service::{self, ProfileEntry};
     use log::warn;
@@ -71,10 +56,7 @@ mod windows_impl {
 
         let shortcut_name = sanitize_shortcut_name(&profile.name);
         let shortcut_path = desktop_dir.join(format!("{SHORTCUT_PREFIX}{shortcut_name}.url"));
-        let shortcut_url = format!(
-            "{DEEP_LINK_SCHEME}://{PROFILE_LINK_HOST}/{}",
-            urlencoding::encode(&profile.id)
-        );
+        let shortcut_url = profile_launch_url(&profile.id);
         let icon_path = resolve_icon_path(&profile)?;
         let contents = format!(
             "[InternetShortcut]\r\nURL={shortcut_url}\r\nIconFile={}\r\nIconIndex=0\r\n",
@@ -177,25 +159,3 @@ mod windows_impl {
 
 #[cfg(windows)]
 pub use windows_impl::{create_desktop_shortcut, register_deep_link_scheme};
-
-#[cfg(test)]
-mod tests {
-    use super::parse_profile_deep_link;
-
-    #[test]
-    fn parses_profile_deep_link() {
-        assert_eq!(
-            parse_profile_deep_link("starlight://profile/my-profile-123"),
-            Some("my-profile-123".to_string())
-        );
-        // Shell-appended trailing slash.
-        assert_eq!(
-            parse_profile_deep_link("starlight://profile/my-profile-123/"),
-            Some("my-profile-123".to_string())
-        );
-        assert_eq!(parse_profile_deep_link("starlight://profile/"), None);
-        assert_eq!(parse_profile_deep_link("starlight://profile/a/b"), None);
-        assert_eq!(parse_profile_deep_link("starlight://other/x"), None);
-        assert_eq!(parse_profile_deep_link("--flag"), None);
-    }
-}

@@ -2,6 +2,7 @@ use gpui::*;
 use log::warn;
 
 use crate::backend::api::{self, Server};
+use crate::backend::deeplink::ServerLink;
 use crate::backend::error::AppResult;
 use crate::backend::services::region_service::{self, RegionInfo};
 use crate::theme::ThemeExt;
@@ -128,6 +129,56 @@ impl ServersView {
         .detach();
     }
 
+    /// Add the server described by a `starlight://servers/add` link. Same path
+    /// as the "Add custom server" dialog, minus the dialog.
+    pub fn add_from_deep_link(&mut self, link: ServerLink, cx: &mut Context<Self>) {
+        // `host` and `editable` have nowhere to live: user servers are stored
+        // as Among Us regions (`regionInfo.json`), which has no field for
+        // either. Logged so a link author can see they arrived.
+        log::info!(
+            "deep link adds server \"{}\" ({}:{}) hosted by {} (editable: {})",
+            link.name,
+            link.address,
+            link.port,
+            link.host,
+            link.editable
+        );
+        self.error = None;
+        self.notice = None;
+        self.custom_dialog = None;
+        cx.notify();
+        cx.spawn(async move |this, cx| {
+            let result = cx
+                .background_executor()
+                .spawn(async move {
+                    region_service::add_custom_region(
+                        &link.name,
+                        &link.address,
+                        link.port,
+                        link.dtls,
+                        link.translate_name,
+                    )
+                    .map(|added| (link.name, added))
+                })
+                .await;
+            let _ = this.update(cx, |this, cx| {
+                match result {
+                    Ok((name, true)) => this.notice = Some(format!("Added region \"{name}\"")),
+                    Ok((name, false)) => {
+                        this.notice = Some(format!("\"{name}\" is already added"));
+                    }
+                    Err(e) => {
+                        warn!("add region from deep link failed: {e}");
+                        this.error = Some(e.to_string());
+                    }
+                }
+                this.reload_regions(cx);
+                cx.notify();
+            });
+        })
+        .detach();
+    }
+
     fn remove_region(&mut self, name: String, cx: &mut Context<Self>) {
         self.error = None;
         self.notice = None;
@@ -195,8 +246,14 @@ impl ServersView {
             let result = cx
                 .background_executor()
                 .spawn(async move {
-                    region_service::add_custom_region(&name, &address, port, dtls)
-                        .map(|added| (name, added))
+                    region_service::add_custom_region(
+                        &name,
+                        &address,
+                        port,
+                        dtls,
+                        region_service::CUSTOM_TRANSLATE_NAME,
+                    )
+                    .map(|added| (name, added))
                 })
                 .await;
             let _ = this.update(cx, |this, cx| {

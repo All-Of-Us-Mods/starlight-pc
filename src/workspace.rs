@@ -2,6 +2,7 @@ use gpui::prelude::FluentBuilder as _;
 use gpui::*;
 use log::warn;
 
+use crate::backend::deeplink::{self, DeepLink};
 use crate::backend::events::{self, BackendEvent};
 use crate::backend::services::launch_service;
 use crate::backend::services::profile_service::{self, ProfileEntry};
@@ -126,6 +127,21 @@ pub struct Workspace {
     stars: Entity<StarsBackground>,
 }
 
+/// Run a deep link against the workspace from the event-bus task, which holds
+/// only a weak handle and no window.
+fn deliver_deep_link(
+    window_handle: AnyWindowHandle,
+    workspace: &WeakEntity<Workspace>,
+    cx: &mut AsyncApp,
+    link: DeepLink,
+) {
+    let _ = window_handle.update(cx, |_, window, cx| {
+        if let Some(workspace) = workspace.upgrade() {
+            workspace.update(cx, |this, cx| this.handle_deep_link(link, window, cx));
+        }
+    });
+}
+
 impl Workspace {
     pub fn new(window: &mut Window, cx: &mut Context<Self>) -> Self {
         let library = cx.new(|cx| LibraryView::new(window, cx));
@@ -171,6 +187,11 @@ impl Workspace {
         let window_handle = window.window_handle();
         let mut rx = events::subscribe();
         cx.spawn(async move |this, cx| {
+            // Deep links forwarded during startup, before this subscription
+            // existed — the bus can't have delivered those.
+            for link in deeplink::take_pending_ui_links() {
+                deliver_deep_link(window_handle, &this, cx, link);
+            }
             while let Ok(event) = rx.recv().await {
                 match event {
                     BackendEvent::ProfileStatsUpdated(_) => {
@@ -187,6 +208,10 @@ impl Workspace {
                     // shortcut) and forwarded here — raise our window.
                     BackendEvent::ActivateWindow => {
                         let _ = window_handle.update(cx, |_, window, _| window.activate_window());
+                    }
+                    // A deep link that needs the UI (see `backend::deeplink`).
+                    BackendEvent::DeepLink(link) => {
+                        deliver_deep_link(window_handle, &this, cx, link);
                     }
                     _ => {}
                 }
@@ -796,6 +821,24 @@ impl Workspace {
             Page::ModDetail(v) => v.clone().into_any_element(),
             Page::LibraryDetail(v) => v.clone().into_any_element(),
             Page::NewsDetail(v) => v.clone().into_any_element(),
+        }
+    }
+
+    /// UI half of deep-link handling — the backend half lives in `main`.
+    /// Every link that shows something goes through here.
+    fn handle_deep_link(&mut self, link: DeepLink, window: &mut Window, cx: &mut Context<Self>) {
+        match link {
+            DeepLink::OpenProfile(profile_id) => self.open_profile(profile_id, window, cx),
+            DeepLink::OpenMod(mod_id) => self.open_mod(mod_id, window, cx),
+            DeepLink::AddServer(server) => {
+                self.switch_tab(Tab::Servers, cx);
+                self.servers
+                    .update(cx, |view, cx| view.add_from_deep_link(*server, cx));
+            }
+            // Launching a profile never reaches the UI.
+            DeepLink::LaunchProfile(profile_id) => {
+                warn!("unexpected launch deep link in the workspace: {profile_id}");
+            }
         }
     }
 

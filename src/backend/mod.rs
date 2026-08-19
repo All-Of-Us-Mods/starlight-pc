@@ -1,4 +1,5 @@
 pub mod api;
+pub mod deeplink;
 pub mod directories;
 pub mod error;
 pub mod events;
