@@ -12,7 +12,7 @@ mod ui;
 mod views;
 mod workspace;
 
-use backend::services::profile_shortcut_service::ProfileDeepLink;
+use backend::deeplink::{self, DeepLink};
 use backend::single_instance;
 
 actions!(starlight, [Quit]);
@@ -72,6 +72,25 @@ fn init_logging() {
     }));
 }
 
+/// Act on a parsed deep link. Links that are pure backend work run here;
+/// anything that needs the UI goes onto the event bus for the workspace.
+fn handle_deep_link(link: DeepLink) {
+    match link {
+        DeepLink::LaunchProfile(profile_id) => {
+            std::thread::spawn(move || launch_profile_by_id(profile_id));
+        }
+        link => backend::events::publish(backend::events::BackendEvent::DeepLink(link)),
+    }
+}
+
+/// Parse a `starlight://` URL and act on it, logging links we can't handle.
+fn handle_deep_link_url(url: &str) {
+    match deeplink::parse(url) {
+        Ok(link) => handle_deep_link(link),
+        Err(e) => log::warn!("ignoring deep link '{url}': {e}"),
+    }
+}
+
 /// Launch a profile by id in the background (deep links / forwarded opens).
 fn launch_profile_by_id(profile_id: String) {
     use backend::services::{launch_service, profile_service};
@@ -99,16 +118,15 @@ fn main() {
         log::warn!("failed to register starlight:// url scheme: {e}");
     }
 
-    // Desktop shortcuts open the app as `starlight.exe starlight://profile/{id}`
-    // (via the registered url scheme) — launch that profile once the app is up;
-    // the `/edit` form opens the profile's page instead.
-    let deep_link = std::env::args()
+    // The shell opens the app as `starlight.exe starlight://…` for a registered
+    // deep link (desktop shortcuts use `starlight://profile/{id}`). Keep the URL
+    // whole: it's forwarded verbatim to a running instance and parsed there.
+    let deep_link_url = std::env::args()
         .skip(1)
-        .find_map(|arg| backend::services::profile_shortcut_service::parse_profile_deep_link(&arg));
-    let request = deep_link.clone().map(|link| match link {
-        ProfileDeepLink::Launch(id) => single_instance::Message::OpenProfile(id),
-        ProfileDeepLink::Edit(id) => single_instance::Message::EditProfile(id),
-    });
+        .find(|arg| arg.starts_with(&format!("{}://", deeplink::SCHEME)));
+    let request = deep_link_url
+        .clone()
+        .map(single_instance::Message::DeepLink);
 
     // If an instance is already running, hand it our deep link (or just ask
     // it to come to the front) and exit instead of opening a second window.
@@ -142,12 +160,7 @@ fn main() {
             if let Some(listener) = listener {
                 single_instance::serve(listener, |message| {
                     match message {
-                        single_instance::Message::OpenProfile(id) => launch_profile_by_id(id),
-                        single_instance::Message::EditProfile(id) => {
-                            backend::events::publish(
-                                backend::events::BackendEvent::OpenProfilePage(id),
-                            );
-                        }
+                        single_instance::Message::DeepLink(url) => handle_deep_link_url(&url),
                         single_instance::Message::Activate => {}
                     }
                     backend::events::publish(backend::events::BackendEvent::ActivateWindow);
@@ -196,21 +209,11 @@ fn main() {
             })
             .unwrap();
 
-            match deep_link {
-                Some(ProfileDeepLink::Launch(profile_id)) => {
-                    cx.background_executor()
-                        .spawn(async move { launch_profile_by_id(profile_id) })
-                        .detach();
-                }
-                // The workspace is already subscribed to the bus, so this
-                // reaches it the same way a forwarded link from a second
-                // instance does.
-                Some(ProfileDeepLink::Edit(profile_id)) => {
-                    backend::events::publish(backend::events::BackendEvent::OpenProfilePage(
-                        profile_id,
-                    ));
-                }
-                None => {}
+            // The workspace is already subscribed to the bus, so a link we
+            // opened with reaches it exactly like one forwarded by a second
+            // instance would.
+            if let Some(url) = &deep_link_url {
+                handle_deep_link_url(url);
             }
         });
 }

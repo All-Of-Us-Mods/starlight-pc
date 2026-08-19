@@ -15,6 +15,7 @@ use std::time::Duration;
 
 use log::warn;
 
+use crate::backend::deeplink;
 use crate::backend::directories;
 
 const PORT_FILE: &str = "instance.port";
@@ -33,10 +34,10 @@ pub enum Instance {
 /// What a secondary instance asks the primary to do.
 #[derive(Debug, Clone)]
 pub enum Message {
-    /// Launch this profile (from a `starlight://profile/{id}` deep link).
-    OpenProfile(String),
-    /// Show this profile's page (from a `starlight://profile/{id}/edit` link).
-    EditProfile(String),
+    /// A `starlight://` URL to handle, forwarded verbatim — the primary parses
+    /// it with [`crate::backend::deeplink`], so new link kinds need no changes
+    /// to this protocol.
+    DeepLink(String),
     /// No payload — just bring the window to the front.
     Activate,
 }
@@ -47,8 +48,7 @@ pub enum Message {
 pub fn acquire(request: Option<Message>) -> Instance {
     if let Some(mut stream) = connect_to_primary() {
         let message = match &request {
-            Some(Message::OpenProfile(id)) => format!("open {id}\n"),
-            Some(Message::EditProfile(id)) => format!("edit {id}\n"),
+            Some(Message::DeepLink(url)) => format!("link {url}\n"),
             Some(Message::Activate) | None => "activate\n".to_string(),
         };
         if stream.write_all(message.as_bytes()).is_ok() && stream.flush().is_ok() {
@@ -117,10 +117,11 @@ pub fn serve(listener: TcpListener, on_message: impl Fn(Message) + Send + 'stati
                     continue;
                 }
                 let line = line.trim();
-                if let Some(id) = line.strip_prefix("open ") {
-                    on_message(Message::OpenProfile(id.to_string()));
-                } else if let Some(id) = line.strip_prefix("edit ") {
-                    on_message(Message::EditProfile(id.to_string()));
+                if let Some(url) = line.strip_prefix("link ") {
+                    on_message(Message::DeepLink(url.to_string()));
+                } else if let Some(id) = line.strip_prefix("open ") {
+                    // Pre-`link` protocol: a bare profile id to launch.
+                    on_message(Message::DeepLink(deeplink::profile_launch_url(id)));
                 } else if line == "activate" {
                     on_message(Message::Activate);
                 }

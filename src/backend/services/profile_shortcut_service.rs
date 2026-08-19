@@ -4,49 +4,13 @@
 //! to the desktop, and the scheme is registered per-user under
 //! `HKCU\Software\Classes` so no elevation is needed. Opening the shortcut
 //! makes the shell start the app with the URL as its first argument, which
-//! `main` picks up via [`parse_profile_deep_link`] to auto-launch the profile.
-
-pub const DEEP_LINK_SCHEME: &str = "starlight";
-pub const PROFILE_LINK_HOST: &str = "profile";
-
-/// What a `starlight://profile/…` deep link asks the app to do.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub enum ProfileDeepLink {
-    /// `starlight://profile/{id}` — launch the profile (desktop shortcuts).
-    Launch(String),
-    /// `starlight://profile/{id}/edit` — open the profile's page in the app.
-    Edit(String),
-}
-
-/// Parse a `starlight://profile/{id}[/edit]` deep link, as passed in argv when
-/// the shell opens the registered scheme.
-pub fn parse_profile_deep_link(arg: &str) -> Option<ProfileDeepLink> {
-    let prefix = format!("{DEEP_LINK_SCHEME}://{PROFILE_LINK_HOST}/");
-    // The shell may append a trailing slash to either form.
-    let rest = arg.strip_prefix(&prefix)?.trim_end_matches('/');
-    let (raw_id, edit) = match rest.split_once('/') {
-        None => (rest, false),
-        Some((id, action)) if action.eq_ignore_ascii_case("edit") => (id, true),
-        Some(_) => return None,
-    };
-    if raw_id.is_empty() {
-        return None;
-    }
-    let id = urlencoding::decode(raw_id).ok()?.trim().to_string();
-    if id.is_empty() {
-        return None;
-    }
-    Some(if edit {
-        ProfileDeepLink::Edit(id)
-    } else {
-        ProfileDeepLink::Launch(id)
-    })
-}
+//! `main` routes through [`crate::backend::deeplink`] to auto-launch the
+//! profile.
 
 #[cfg(windows)]
 mod windows_impl {
-    use super::{DEEP_LINK_SCHEME, PROFILE_LINK_HOST};
     use crate::backend::api;
+    use crate::backend::deeplink::{SCHEME as DEEP_LINK_SCHEME, profile_launch_url};
     use crate::backend::error::{AppError, AppResult};
     use crate::backend::services::profile_service::{self, ProfileEntry};
     use log::warn;
@@ -92,10 +56,7 @@ mod windows_impl {
 
         let shortcut_name = sanitize_shortcut_name(&profile.name);
         let shortcut_path = desktop_dir.join(format!("{SHORTCUT_PREFIX}{shortcut_name}.url"));
-        let shortcut_url = format!(
-            "{DEEP_LINK_SCHEME}://{PROFILE_LINK_HOST}/{}",
-            urlencoding::encode(&profile.id)
-        );
+        let shortcut_url = profile_launch_url(&profile.id);
         let icon_path = resolve_icon_path(&profile)?;
         let contents = format!(
             "[InternetShortcut]\r\nURL={shortcut_url}\r\nIconFile={}\r\nIconIndex=0\r\n",
@@ -198,47 +159,3 @@ mod windows_impl {
 
 #[cfg(windows)]
 pub use windows_impl::{create_desktop_shortcut, register_deep_link_scheme};
-
-#[cfg(test)]
-mod tests {
-    use super::{ProfileDeepLink, parse_profile_deep_link};
-
-    #[test]
-    fn parses_profile_deep_link() {
-        assert_eq!(
-            parse_profile_deep_link("starlight://profile/my-profile-123"),
-            Some(ProfileDeepLink::Launch("my-profile-123".to_string()))
-        );
-        // Shell-appended trailing slash.
-        assert_eq!(
-            parse_profile_deep_link("starlight://profile/my-profile-123/"),
-            Some(ProfileDeepLink::Launch("my-profile-123".to_string()))
-        );
-        assert_eq!(parse_profile_deep_link("starlight://profile/"), None);
-        assert_eq!(parse_profile_deep_link("starlight://profile/a/b"), None);
-        assert_eq!(parse_profile_deep_link("starlight://other/x"), None);
-        assert_eq!(parse_profile_deep_link("--flag"), None);
-    }
-
-    #[test]
-    fn parses_edit_deep_link() {
-        assert_eq!(
-            parse_profile_deep_link("starlight://profile/my-profile-123/edit"),
-            Some(ProfileDeepLink::Edit("my-profile-123".to_string()))
-        );
-        assert_eq!(
-            parse_profile_deep_link("starlight://profile/my-profile-123/edit/"),
-            Some(ProfileDeepLink::Edit("my-profile-123".to_string()))
-        );
-        // Percent-encoded ids decode the same for both forms.
-        assert_eq!(
-            parse_profile_deep_link("starlight://profile/town%20of%20us-1/edit"),
-            Some(ProfileDeepLink::Edit("town of us-1".to_string()))
-        );
-        assert_eq!(parse_profile_deep_link("starlight://profile//edit"), None);
-        assert_eq!(
-            parse_profile_deep_link("starlight://profile/my-profile-123/delete"),
-            None
-        );
-    }
-}

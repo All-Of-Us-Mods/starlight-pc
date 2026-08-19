@@ -2,6 +2,7 @@ use gpui::prelude::FluentBuilder as _;
 use gpui::*;
 use log::warn;
 
+use crate::backend::deeplink::DeepLink;
 use crate::backend::events::{self, BackendEvent};
 use crate::backend::services::launch_service;
 use crate::backend::services::profile_service::{self, ProfileEntry};
@@ -188,12 +189,12 @@ impl Workspace {
                     BackendEvent::ActivateWindow => {
                         let _ = window_handle.update(cx, |_, window, _| window.activate_window());
                     }
-                    // `starlight://profile/{id}/edit` — show that profile's page.
-                    BackendEvent::OpenProfilePage(profile_id) => {
+                    // A deep link that needs the UI (see `backend::deeplink`).
+                    BackendEvent::DeepLink(link) => {
                         let _ = window_handle.update(cx, |_, window, cx| {
                             if let Some(workspace) = this.upgrade() {
                                 workspace.update(cx, |this, cx| {
-                                    this.open_profile(profile_id.clone(), window, cx);
+                                    this.handle_deep_link(link.clone(), window, cx);
                                 });
                             }
                         });
@@ -806,6 +807,24 @@ impl Workspace {
             Page::ModDetail(v) => v.clone().into_any_element(),
             Page::LibraryDetail(v) => v.clone().into_any_element(),
             Page::NewsDetail(v) => v.clone().into_any_element(),
+        }
+    }
+
+    /// UI half of deep-link handling — the backend half lives in `main`.
+    /// Every link that shows something goes through here.
+    fn handle_deep_link(&mut self, link: DeepLink, window: &mut Window, cx: &mut Context<Self>) {
+        match link {
+            DeepLink::OpenProfile(profile_id) => self.open_profile(profile_id, window, cx),
+            DeepLink::OpenMod(mod_id) => self.open_mod(mod_id, window, cx),
+            DeepLink::AddServer(server) => {
+                self.switch_tab(Tab::Servers, cx);
+                self.servers
+                    .update(cx, |view, cx| view.add_from_deep_link(*server, cx));
+            }
+            // Launching a profile never reaches the UI.
+            DeepLink::LaunchProfile(profile_id) => {
+                warn!("unexpected launch deep link in the workspace: {profile_id}");
+            }
         }
     }
 
