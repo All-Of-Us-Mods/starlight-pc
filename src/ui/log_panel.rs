@@ -274,7 +274,11 @@ impl Render for LogPanel {
             )
             .child(
                 div().h(px(320.0)).child(
+                    // Read-only: this is a log viewer, and the text is
+                    // rewritten from the log file on every refresh — typing
+                    // into it would only be undone. `set_value` still applies.
                     Editor::new(&self.view_input)
+                        .readonly(true)
                         .font_family("ui-monospace, monospace")
                         .size_full(),
                 ),
