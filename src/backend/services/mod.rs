@@ -17,3 +17,13 @@ pub mod region_service;
 pub mod update_service;
 #[cfg(windows)]
 pub mod xbox_service;
+
+/// Lowercase hex of a digest. `sha2` 0.11 hands back a `hybrid_array::Array`,
+/// which no longer formats with `{:x}`.
+pub fn hex_digest(bytes: impl AsRef<[u8]>) -> String {
+    use std::fmt::Write as _;
+    bytes.as_ref().iter().fold(String::new(), |mut out, byte| {
+        let _ = write!(out, "{byte:02x}");
+        out
+    })
+}

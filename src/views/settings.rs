@@ -302,7 +302,7 @@ fn path_field(
 
         let state_key: SharedString = format!(
             "path-field-{}-{}-{}-{}",
-            key, options.page_ix, options.group_ix, options.item_ix
+            key, options.page_ix(), options.group_ix(), options.item_ix()
         )
         .into();
 
@@ -332,15 +332,15 @@ fn path_field(
         };
         let button_id: SharedString = format!(
             "path-browse-{}-{}-{}-{}",
-            key, options.page_ix, options.group_ix, options.item_ix
+            key, options.page_ix(), options.group_ix(), options.item_ix()
         )
         .into();
         let setter: PathSetter = Rc::new(set);
 
         let input_el = Input::new(&input_entity)
-            .with_size(options.size)
+            .with_size(options.size())
             .map(|this| {
-                if options.layout.is_horizontal() {
+                if options.layout().is_horizontal() {
                     this.w_64()
                 } else {
                     this.w_full()
@@ -351,7 +351,7 @@ fn path_field(
             Button::new(button_id)
                 .icon(Icon::new(IconName::FolderOpen))
                 .label("Browse")
-                .with_size(options.size)
+                .with_size(options.size())
                 .on_click(move |_, window, cx| {
                     let receiver = cx.prompt_for_paths(PathPromptOptions {
                         files: !directories_only,
