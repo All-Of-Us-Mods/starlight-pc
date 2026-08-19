@@ -8,7 +8,8 @@ const DEFAULT_BEPINEX_URL_X86: &str = "https://builds.bepinex.dev/projects/bepin
 const DEFAULT_BEPINEX_URL_X64: &str = "https://builds.bepinex.dev/projects/bepinex_be/752/BepInEx-Unity.IL2CPP-win-x64-6.0.0-be.752%2Bdd0655f.zip";
 const SETTINGS_FILE_NAME: &str = "settings.json";
 const BOOT_CONFIG_FILE_NAME: &str = "boot.config";
-const SINGLE_INSTANCE_KEY: &str = "single_instance=";
+/// Unity writes this entry with hyphens, alongside `build-guid=` and friends.
+const SINGLE_INSTANCE_KEY: &str = "single-instance=";
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
@@ -436,14 +437,20 @@ mod tests {
 
     #[test]
     fn remove_single_instance_line_preserves_other_boot_config_content() {
-        let contents = "build_guid=abc\r\nsingle_instance=1\r\nfoo=bar\r\n";
+        // Verbatim shape of a real Among Us boot.config: hyphenated keys, and
+        // single-instance carries no value.
+        let contents = "gc-max-time-slice=3\nsingle-instance=\nbuild-guid=abc\n";
 
         assert_eq!(
             remove_single_instance_line(contents),
-            Some("build_guid=abc\r\nfoo=bar\r\n".to_string())
+            Some("gc-max-time-slice=3\nbuild-guid=abc\n".to_string())
         );
         assert_eq!(
-            remove_single_instance_line("build_guid=abc\nfoo=bar\n"),
+            remove_single_instance_line("build-guid=abc\r\nsingle-instance=\r\nfoo=bar\r\n"),
+            Some("build-guid=abc\r\nfoo=bar\r\n".to_string())
+        );
+        assert_eq!(
+            remove_single_instance_line("build-guid=abc\nfoo=bar\n"),
             None
         );
     }

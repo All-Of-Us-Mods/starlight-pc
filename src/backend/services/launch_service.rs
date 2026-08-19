@@ -5,7 +5,7 @@ use crate::backend::services::profile_service::ProfileEntry;
 #[cfg(windows)]
 use crate::backend::services::xbox_service;
 use crate::backend::state::game_runtime::{self, LaunchInstance};
-use log::{debug, info};
+use log::{debug, info, warn};
 use serde::Deserialize;
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -702,6 +702,18 @@ pub fn launch_modded_for_profile(profile: ProfileEntry) -> AppResult<()> {
 
     if matches!(settings.game_platform, core_service::GamePlatform::Steam) {
         ensure_steam_appid_file(game_exe.parent().expect("game_exe has a parent"));
+    }
+
+    // Unity refuses to start a second process while boot.config carries this
+    // entry, so instance copies alone wouldn't buy multi-instance launching.
+    // Checked on every launch rather than only when the setting is toggled: a
+    // game update rewrites boot.config and puts the entry back. Best-effort —
+    // a read-only game dir shouldn't stop a single instance from launching.
+    if settings.allow_multi_instance_launch
+        && let Err(e) =
+            core_service::remove_single_instance_from_boot_config(&settings.among_us_path)
+    {
+        warn!("failed to clear single-instance from boot.config: {e}");
     }
 
     #[cfg(target_os = "linux")]
