@@ -62,3 +62,14 @@ image = { version = "0.25", default-features = false, features = [
 
 [target.'cfg(windows)'.build-dependencies]
 winresource = "0.1"
+
+# Debuginfo is what makes this tree expensive: gpui + gpui-component + windows
+# generate hundreds of MB of it each, and every byte costs codegen time, link
+# time and disk. Dependencies are never stepped through here, so they get none;
+# our own code keeps line tables, which is all the panic backtraces in
+# `init_logging` need.
+[profile.dev]
+debug = "line-tables-only"
+
+[profile.dev.package."*"]
+debug = false
