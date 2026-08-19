@@ -146,6 +146,7 @@ pub fn take_pending_ui_links() -> Vec<DeepLink> {
 }
 
 /// The `starlight://profile/{id}` URL a desktop shortcut launches.
+#[cfg(any(windows, test))]
 pub fn profile_launch_url(profile_id: &str) -> String {
     format!("{SCHEME}://profile/{}", urlencoding::encode(profile_id))
 }
