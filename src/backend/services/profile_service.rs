@@ -215,9 +215,10 @@ fn sync_custom_mods(profile: &mut ProfileEntry) {
     let mut tracked: HashSet<String> = HashSet::new();
     for mod_entry in &mut profile.mods {
         if let Some(file) = mod_entry.file.clone() {
-            if mod_entry.is_custom()
-                && let Some(enabled) = on_disk.get(&file)
-            {
+            // Disk is the source of truth for the enabled flag: enabling and
+            // disabling renames the file, so a `.disabled` twin means off —
+            // including for catalog mods that arrived that way from an import.
+            if let Some(enabled) = on_disk.get(&file) {
                 mod_entry.enabled = *enabled;
             }
             tracked.insert(file);
@@ -812,6 +813,10 @@ struct ImportedMetadata {
     custom_icon_extension: Option<String>,
     icon_mod_id: Option<String>,
     mods: Option<serde_json::Value>,
+    /// mod id -> plugin file name, written by our exporter alongside the
+    /// id -> version `mods` map. Absent in zips from other sources.
+    #[serde(default)]
+    mod_files: HashMap<String, String>,
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -922,8 +927,8 @@ pub fn import_profile_zip(zip_path: &str) -> AppResult<Vec<ProfileEntry>> {
                 .and_then(|ext| normalize_custom_icon_extension(&ext)),
             icon_mod_id: imported.as_ref().and_then(|item| item.icon_mod_id.clone()),
             mods: imported
-                .and_then(|item| item.mods)
-                .map(|mods_value| {
+                .and_then(|item| item.mods.map(|mods| (mods, item.mod_files)))
+                .map(|(mods_value, mod_files)| {
                     let mut entries = Vec::new();
                     if let Some(mods_map) = mods_value.as_object() {
                         for (mod_id, version_val) in mods_map {
@@ -931,7 +936,7 @@ pub fn import_profile_zip(zip_path: &str) -> AppResult<Vec<ProfileEntry>> {
                             entries.push(ProfileModEntry {
                                 mod_id: mod_id.clone(),
                                 version,
-                                file: None,
+                                file: mod_files.get(mod_id).cloned(),
                                 enabled: true,
                             });
                         }
