@@ -31,8 +31,7 @@ pub fn export_profile_zip(
         fs::create_dir_all(parent)?;
     }
 
-    let (sanitized_metadata, managed_files) =
-        build_sanitized_metadata_and_extract_files(profile_dir)?;
+    let sanitized_metadata = build_sanitized_metadata(profile_dir)?;
 
     let output = File::create(destination_path)?;
     let mut zip = ZipWriter::new(output);
@@ -44,7 +43,6 @@ pub fn export_profile_zip(
         destination_path,
         options,
         sanitized_metadata: &sanitized_metadata,
-        managed_files: &managed_files,
     };
 
     let mut progress = ExportProgress {
@@ -223,7 +221,6 @@ struct ZipExportContext<'a> {
     destination_path: &'a Path,
     options: SimpleFileOptions,
     sanitized_metadata: &'a str,
-    managed_files: &'a std::collections::HashSet<String>,
 }
 
 /// Tracks files written vs. total so we can report 0–100% progress.
@@ -278,7 +275,7 @@ fn add_directory_to_zip(
         let relative = path
             .strip_prefix(ctx.root_dir)
             .map_err(|e| AppError::other(e.to_string()))?;
-        if should_skip_export_file(relative, ctx.managed_files) {
+        if should_skip_export_file(relative) {
             continue;
         }
 
@@ -313,9 +310,7 @@ fn add_directory_to_zip(
     Ok(())
 }
 
-fn build_sanitized_metadata_and_extract_files(
-    profile_dir: &Path,
-) -> AppResult<(String, std::collections::HashSet<String>)> {
+fn build_sanitized_metadata(profile_dir: &Path) -> AppResult<String> {
     let metadata_path = profile_dir.join("metadata.json");
     let mut metadata = match fs::read_to_string(&metadata_path) {
         Ok(content) => parse_metadata_object(&content),
@@ -337,32 +332,31 @@ fn build_sanitized_metadata_and_extract_files(
         );
     }
 
-    let mut managed_files = std::collections::HashSet::new();
-
     if let Some(Value::Array(mods_array)) = metadata.get("mods") {
         let mut new_mods = Map::new();
+        // Which plugin file each mod owns. `mods` stays a bare id -> version map
+        // for compatibility with older readers; this side map lets our own
+        // importer re-attach the shipped DLLs to their catalog entries instead
+        // of surfacing them as loose "custom" mods.
+        let mut mod_files = Map::new();
         for mod_entry in mods_array {
-            if let Some(obj) = mod_entry.as_object() {
-                if let Some(Value::String(file_name)) = obj.get("file") {
-                    managed_files.insert(file_name.clone());
-                }
-
-                if let (Some(Value::String(mod_id)), Some(Value::String(version))) =
+            if let Some(obj) = mod_entry.as_object()
+                && let (Some(Value::String(mod_id)), Some(Value::String(version))) =
                     (obj.get("mod_id"), obj.get("version"))
-                {
-                    new_mods.insert(mod_id.clone(), Value::String(version.clone()));
+            {
+                new_mods.insert(mod_id.clone(), Value::String(version.clone()));
+                if let Some(Value::String(file_name)) = obj.get("file") {
+                    mod_files.insert(mod_id.clone(), Value::String(file_name.clone()));
                 }
             }
         }
         metadata.insert("mods".to_string(), Value::Object(new_mods));
+        metadata.insert("mod_files".to_string(), Value::Object(mod_files));
     } else if !metadata.contains_key("mods") {
         metadata.insert("mods".to_string(), Value::Object(Map::new()));
     }
 
-    Ok((
-        serde_json::to_string_pretty(&Value::Object(metadata))?,
-        managed_files,
-    ))
+    Ok(serde_json::to_string_pretty(&Value::Object(metadata))?)
 }
 
 fn parse_metadata_object(content: &str) -> Map<String, Value> {
@@ -411,19 +405,10 @@ fn is_metadata_file(path: &Path) -> bool {
         .unwrap_or(false)
 }
 
-fn should_skip_export_file(path: &Path, managed_files: &std::collections::HashSet<String>) -> bool {
-    let components: Vec<_> = path.components().collect();
-    if components.len() >= 3
-        && let (Some(Component::Normal(c0)), Some(Component::Normal(c1))) =
-            (components.first(), components.get(1))
-        && c0.to_string_lossy().eq_ignore_ascii_case("bepinex")
-        && c1.to_string_lossy().eq_ignore_ascii_case("plugins")
-        && let Some(file_name) = path.file_name().and_then(|n| n.to_str())
-        && managed_files.contains(file_name)
-    {
-        return true;
-    }
-
+/// Only BepInEx's log files are left out — every plugin ships in the zip,
+/// including mods from the Starlight catalog, so an imported profile is
+/// playable without re-downloading anything.
+fn should_skip_export_file(path: &Path) -> bool {
     let is_log_file = path
         .file_name()
         .and_then(|name| name.to_str())
@@ -458,4 +443,58 @@ fn to_zip_path(path: &Path) -> AppResult<String> {
         }
     }
     Ok(parts.join("/"))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn temp_profile(tag: &str) -> PathBuf {
+        let dir = std::env::temp_dir().join(format!("starlight-zip-{tag}-{}", std::process::id()));
+        let _ = fs::remove_dir_all(&dir);
+        fs::create_dir_all(&dir).unwrap();
+        dir
+    }
+
+    #[test]
+    fn plugins_are_exported_and_only_bepinex_logs_are_skipped() {
+        assert!(!should_skip_export_file(Path::new(
+            "BepInEx/plugins/Reactor.dll"
+        )));
+        assert!(should_skip_export_file(Path::new("BepInEx/LogOutput.log")));
+        assert!(!should_skip_export_file(Path::new("LogOutput.log")));
+    }
+
+    #[test]
+    fn metadata_keeps_the_id_version_map_and_adds_plugin_file_names() {
+        let dir = temp_profile("metadata");
+        fs::write(
+            dir.join("metadata.json"),
+            br#"{
+                "id": "reactor-1",
+                "path": "C:/somewhere",
+                "name": "Reactor",
+                "mods": [
+                    {"mod_id": "reactor", "version": "2.0.0", "file": "Reactor.dll", "enabled": true},
+                    {"mod_id": "custom:Loose.dll", "version": "", "enabled": true}
+                ]
+            }"#,
+        )
+        .unwrap();
+
+        let metadata = build_sanitized_metadata(&dir).unwrap();
+        let value: Value = serde_json::from_str(&metadata).unwrap();
+
+        assert!(value.get("id").is_none());
+        assert!(value.get("path").is_none());
+        assert_eq!(value["mods"]["reactor"], Value::String("2.0.0".into()));
+        assert_eq!(
+            value["mod_files"]["reactor"],
+            Value::String("Reactor.dll".into())
+        );
+        // A mod with no file recorded contributes nothing to the side map.
+        assert!(value["mod_files"].get("custom:Loose.dll").is_none());
+
+        let _ = fs::remove_dir_all(&dir);
+    }
 }
