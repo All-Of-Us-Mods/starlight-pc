@@ -79,7 +79,7 @@ fn handle_deep_link(link: DeepLink) {
         DeepLink::LaunchProfile(profile_id) => {
             std::thread::spawn(move || launch_profile_by_id(profile_id));
         }
-        link => backend::events::publish(backend::events::BackendEvent::DeepLink(link)),
+        link => deeplink::dispatch_to_ui(link),
     }
 }
 

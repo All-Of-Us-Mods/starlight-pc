@@ -6,7 +6,8 @@
 //! resulting [`DeepLink`] is routed in one place (`main::handle_deep_link`),
 //! which either does the backend work itself or publishes
 //! [`crate::backend::events::BackendEvent::DeepLink`] for the workspace to
-//! act on.
+//! act on — via [`dispatch_to_ui`], which holds links that arrive before the
+//! workspace is listening.
 //!
 //! Supported links:
 //!
@@ -22,6 +23,9 @@
 
 use std::collections::HashMap;
 use std::fmt;
+use std::sync::Mutex;
+
+use crate::backend::events::{self, BackendEvent};
 
 pub const SCHEME: &str = "starlight";
 
@@ -106,6 +110,39 @@ pub fn parse(arg: &str) -> Result<DeepLink, ParseError> {
         ["servers", "add"] => Ok(DeepLink::AddServer(Box::new(parse_server_link(query)?))),
         _ => Err(ParseError::Unsupported(path.to_string())),
     }
+}
+
+/// Links waiting for the workspace to start listening. The event bus only
+/// delivers to receivers that already exist, and a forwarded link can arrive
+/// during startup — before the workspace subscribes — so those are parked here
+/// instead of being dropped.
+struct UiSink {
+    listening: bool,
+    pending: Vec<DeepLink>,
+}
+
+static UI_SINK: Mutex<UiSink> = Mutex::new(UiSink {
+    listening: false,
+    pending: Vec::new(),
+});
+
+/// Hand a link to the UI: published now if the workspace is listening, parked
+/// for [`take_pending_ui_links`] if it isn't yet.
+pub fn dispatch_to_ui(link: DeepLink) {
+    let mut sink = UI_SINK.lock().unwrap_or_else(|e| e.into_inner());
+    if sink.listening {
+        events::publish(BackendEvent::DeepLink(link));
+    } else {
+        sink.pending.push(link);
+    }
+}
+
+/// Called by the workspace right after it subscribes to the event bus: marks
+/// the UI as listening and returns the links that arrived before then.
+pub fn take_pending_ui_links() -> Vec<DeepLink> {
+    let mut sink = UI_SINK.lock().unwrap_or_else(|e| e.into_inner());
+    sink.listening = true;
+    std::mem::take(&mut sink.pending)
 }
 
 /// The `starlight://profile/{id}` URL a desktop shortcut launches.

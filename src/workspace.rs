@@ -2,7 +2,7 @@ use gpui::prelude::FluentBuilder as _;
 use gpui::*;
 use log::warn;
 
-use crate::backend::deeplink::DeepLink;
+use crate::backend::deeplink::{self, DeepLink};
 use crate::backend::events::{self, BackendEvent};
 use crate::backend::services::launch_service;
 use crate::backend::services::profile_service::{self, ProfileEntry};
@@ -127,6 +127,21 @@ pub struct Workspace {
     stars: Entity<StarsBackground>,
 }
 
+/// Run a deep link against the workspace from the event-bus task, which holds
+/// only a weak handle and no window.
+fn deliver_deep_link(
+    window_handle: AnyWindowHandle,
+    workspace: &WeakEntity<Workspace>,
+    cx: &mut AsyncApp,
+    link: DeepLink,
+) {
+    let _ = window_handle.update(cx, |_, window, cx| {
+        if let Some(workspace) = workspace.upgrade() {
+            workspace.update(cx, |this, cx| this.handle_deep_link(link, window, cx));
+        }
+    });
+}
+
 impl Workspace {
     pub fn new(window: &mut Window, cx: &mut Context<Self>) -> Self {
         let library = cx.new(|cx| LibraryView::new(window, cx));
@@ -172,6 +187,11 @@ impl Workspace {
         let window_handle = window.window_handle();
         let mut rx = events::subscribe();
         cx.spawn(async move |this, cx| {
+            // Deep links forwarded during startup, before this subscription
+            // existed — the bus can't have delivered those.
+            for link in deeplink::take_pending_ui_links() {
+                deliver_deep_link(window_handle, &this, cx, link);
+            }
             while let Ok(event) = rx.recv().await {
                 match event {
                     BackendEvent::ProfileStatsUpdated(_) => {
@@ -191,13 +211,7 @@ impl Workspace {
                     }
                     // A deep link that needs the UI (see `backend::deeplink`).
                     BackendEvent::DeepLink(link) => {
-                        let _ = window_handle.update(cx, |_, window, cx| {
-                            if let Some(workspace) = this.upgrade() {
-                                workspace.update(cx, |this, cx| {
-                                    this.handle_deep_link(link.clone(), window, cx);
-                                });
-                            }
-                        });
+                        deliver_deep_link(window_handle, &this, cx, link);
                     }
                     _ => {}
                 }

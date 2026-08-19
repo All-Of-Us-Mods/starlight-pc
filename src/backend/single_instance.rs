@@ -15,11 +15,13 @@ use std::time::Duration;
 
 use log::warn;
 
-use crate::backend::deeplink;
 use crate::backend::directories;
 
 const PORT_FILE: &str = "instance.port";
 const GREETING: &str = "STARLIGHT v1";
+/// Written back once the primary has accepted a message, so the secondary can
+/// tell delivery from a message that was dropped on the floor.
+const ACK: &str = "OK";
 const IO_TIMEOUT: Duration = Duration::from_millis(500);
 
 pub enum Instance {
@@ -47,13 +49,18 @@ pub enum Message {
 /// return [`Instance::Forwarded`].
 pub fn acquire(request: Option<Message>) -> Instance {
     if let Some(mut stream) = connect_to_primary() {
-        let message = match &request {
-            Some(Message::DeepLink(url)) => format!("link {url}\n"),
-            Some(Message::Activate) | None => "activate\n".to_string(),
+        let line = match &request {
+            Some(Message::DeepLink(url)) => format!("link {url}"),
+            Some(Message::Activate) | None => "activate".to_string(),
         };
-        if stream.write_all(message.as_bytes()).is_ok() && stream.flush().is_ok() {
+        // Only a confirmed message counts as forwarded. Without the ack the
+        // primary may have dropped it (or died mid-handshake), and exiting
+        // then would lose the deep link entirely — so fall through and take
+        // over as primary instead.
+        if send(&mut stream, &line) {
             return Instance::Forwarded;
         }
+        warn!("running instance did not acknowledge '{line}'; starting a new one");
     }
 
     match TcpListener::bind((Ipv4Addr::LOCALHOST, 0)) {
@@ -74,6 +81,21 @@ pub fn acquire(request: Option<Message>) -> Instance {
             Instance::Primary(None)
         }
     }
+}
+
+/// Send one message and wait for the primary's [`ACK`]. `false` means the
+/// message wasn't delivered: the write failed, the primary didn't recognize
+/// the line, or it went away before answering.
+fn send(stream: &mut TcpStream, line: &str) -> bool {
+    if stream
+        .write_all(format!("{line}\n").as_bytes())
+        .and_then(|()| stream.flush())
+        .is_err()
+    {
+        return false;
+    }
+    let mut ack = String::new();
+    BufReader::new(stream).read_line(&mut ack).is_ok() && ack.trim() == ACK
 }
 
 /// Connect to the recorded primary and verify it greets like Starlight.
@@ -117,13 +139,20 @@ pub fn serve(listener: TcpListener, on_message: impl Fn(Message) + Send + 'stati
                     continue;
                 }
                 let line = line.trim();
-                if let Some(url) = line.strip_prefix("link ") {
+                let understood = if let Some(url) = line.strip_prefix("link ") {
                     on_message(Message::DeepLink(url.to_string()));
-                } else if let Some(id) = line.strip_prefix("open ") {
-                    // Pre-`link` protocol: a bare profile id to launch.
-                    on_message(Message::DeepLink(deeplink::profile_launch_url(id)));
+                    true
                 } else if line == "activate" {
                     on_message(Message::Activate);
+                    true
+                } else {
+                    warn!("ignoring unknown message from another instance: {line}");
+                    false
+                };
+                // The secondary waits for this before it exits; leaving it
+                // unsent is what tells it the message didn't land.
+                if understood {
+                    let _ = stream.write_all(format!("{ACK}\n").as_bytes());
                 }
             }
         })
