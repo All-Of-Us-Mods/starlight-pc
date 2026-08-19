@@ -31,22 +31,25 @@ pub enum Instance {
 }
 
 /// What a secondary instance asks the primary to do.
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum Message {
     /// Launch this profile (from a `starlight://profile/{id}` deep link).
     OpenProfile(String),
+    /// Show this profile's page (from a `starlight://profile/{id}/edit` link).
+    EditProfile(String),
     /// No payload — just bring the window to the front.
     Activate,
 }
 
 /// Decide whether this process is the primary instance. If a primary is
-/// already running, forward `deep_link_profile` (or an activate request) to
-/// it and return [`Instance::Forwarded`].
-pub fn acquire(deep_link_profile: Option<&str>) -> Instance {
+/// already running, forward `request` (or an activate request) to it and
+/// return [`Instance::Forwarded`].
+pub fn acquire(request: Option<Message>) -> Instance {
     if let Some(mut stream) = connect_to_primary() {
-        let message = match deep_link_profile {
-            Some(id) => format!("open {id}\n"),
-            None => "activate\n".to_string(),
+        let message = match &request {
+            Some(Message::OpenProfile(id)) => format!("open {id}\n"),
+            Some(Message::EditProfile(id)) => format!("edit {id}\n"),
+            Some(Message::Activate) | None => "activate\n".to_string(),
         };
         if stream.write_all(message.as_bytes()).is_ok() && stream.flush().is_ok() {
             return Instance::Forwarded;
@@ -116,6 +119,8 @@ pub fn serve(listener: TcpListener, on_message: impl Fn(Message) + Send + 'stati
                 let line = line.trim();
                 if let Some(id) = line.strip_prefix("open ") {
                     on_message(Message::OpenProfile(id.to_string()));
+                } else if let Some(id) = line.strip_prefix("edit ") {
+                    on_message(Message::EditProfile(id.to_string()));
                 } else if line == "activate" {
                     on_message(Message::Activate);
                 }

@@ -12,6 +12,7 @@ mod ui;
 mod views;
 mod workspace;
 
+use backend::services::profile_shortcut_service::ProfileDeepLink;
 use backend::single_instance;
 
 actions!(starlight, [Quit]);
@@ -99,14 +100,19 @@ fn main() {
     }
 
     // Desktop shortcuts open the app as `starlight.exe starlight://profile/{id}`
-    // (via the registered url scheme) — launch that profile once the app is up.
-    let deep_link_profile = std::env::args()
+    // (via the registered url scheme) — launch that profile once the app is up;
+    // the `/edit` form opens the profile's page instead.
+    let deep_link = std::env::args()
         .skip(1)
         .find_map(|arg| backend::services::profile_shortcut_service::parse_profile_deep_link(&arg));
+    let request = deep_link.clone().map(|link| match link {
+        ProfileDeepLink::Launch(id) => single_instance::Message::OpenProfile(id),
+        ProfileDeepLink::Edit(id) => single_instance::Message::EditProfile(id),
+    });
 
     // If an instance is already running, hand it our deep link (or just ask
     // it to come to the front) and exit instead of opening a second window.
-    let listener = match single_instance::acquire(deep_link_profile.as_deref()) {
+    let listener = match single_instance::acquire(request) {
         single_instance::Instance::Forwarded => {
             log::info!("forwarded to the running instance; exiting");
             return;
@@ -137,6 +143,11 @@ fn main() {
                 single_instance::serve(listener, |message| {
                     match message {
                         single_instance::Message::OpenProfile(id) => launch_profile_by_id(id),
+                        single_instance::Message::EditProfile(id) => {
+                            backend::events::publish(
+                                backend::events::BackendEvent::OpenProfilePage(id),
+                            );
+                        }
                         single_instance::Message::Activate => {}
                     }
                     backend::events::publish(backend::events::BackendEvent::ActivateWindow);
@@ -185,10 +196,21 @@ fn main() {
             })
             .unwrap();
 
-            if let Some(profile_id) = deep_link_profile {
-                cx.background_executor()
-                    .spawn(async move { launch_profile_by_id(profile_id) })
-                    .detach();
+            match deep_link {
+                Some(ProfileDeepLink::Launch(profile_id)) => {
+                    cx.background_executor()
+                        .spawn(async move { launch_profile_by_id(profile_id) })
+                        .detach();
+                }
+                // The workspace is already subscribed to the bus, so this
+                // reaches it the same way a forwarded link from a second
+                // instance does.
+                Some(ProfileDeepLink::Edit(profile_id)) => {
+                    backend::events::publish(backend::events::BackendEvent::OpenProfilePage(
+                        profile_id,
+                    ));
+                }
+                None => {}
             }
         });
 }

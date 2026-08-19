@@ -188,6 +188,16 @@ impl Workspace {
                     BackendEvent::ActivateWindow => {
                         let _ = window_handle.update(cx, |_, window, _| window.activate_window());
                     }
+                    // `starlight://profile/{id}/edit` — show that profile's page.
+                    BackendEvent::OpenProfilePage(profile_id) => {
+                        let _ = window_handle.update(cx, |_, window, cx| {
+                            if let Some(workspace) = this.upgrade() {
+                                workspace.update(cx, |this, cx| {
+                                    this.open_profile(profile_id.clone(), window, cx);
+                                });
+                            }
+                        });
+                    }
                     _ => {}
                 }
             }

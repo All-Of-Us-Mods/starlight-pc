@@ -9,17 +9,38 @@
 pub const DEEP_LINK_SCHEME: &str = "starlight";
 pub const PROFILE_LINK_HOST: &str = "profile";
 
-/// Extract the profile id from a `starlight://profile/{id}` deep link, as
-/// passed in argv when the shell opens the registered scheme.
-pub fn parse_profile_deep_link(arg: &str) -> Option<String> {
+/// What a `starlight://profile/…` deep link asks the app to do.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum ProfileDeepLink {
+    /// `starlight://profile/{id}` — launch the profile (desktop shortcuts).
+    Launch(String),
+    /// `starlight://profile/{id}/edit` — open the profile's page in the app.
+    Edit(String),
+}
+
+/// Parse a `starlight://profile/{id}[/edit]` deep link, as passed in argv when
+/// the shell opens the registered scheme.
+pub fn parse_profile_deep_link(arg: &str) -> Option<ProfileDeepLink> {
     let prefix = format!("{DEEP_LINK_SCHEME}://{PROFILE_LINK_HOST}/");
-    let rest = arg.strip_prefix(&prefix)?;
-    let id = rest.trim_end_matches('/');
-    if id.is_empty() || id.contains('/') {
+    // The shell may append a trailing slash to either form.
+    let rest = arg.strip_prefix(&prefix)?.trim_end_matches('/');
+    let (raw_id, edit) = match rest.split_once('/') {
+        None => (rest, false),
+        Some((id, action)) if action.eq_ignore_ascii_case("edit") => (id, true),
+        Some(_) => return None,
+    };
+    if raw_id.is_empty() {
         return None;
     }
-    let id = urlencoding::decode(id).ok()?.trim().to_string();
-    (!id.is_empty()).then_some(id)
+    let id = urlencoding::decode(raw_id).ok()?.trim().to_string();
+    if id.is_empty() {
+        return None;
+    }
+    Some(if edit {
+        ProfileDeepLink::Edit(id)
+    } else {
+        ProfileDeepLink::Launch(id)
+    })
 }
 
 #[cfg(windows)]
@@ -180,22 +201,44 @@ pub use windows_impl::{create_desktop_shortcut, register_deep_link_scheme};
 
 #[cfg(test)]
 mod tests {
-    use super::parse_profile_deep_link;
+    use super::{ProfileDeepLink, parse_profile_deep_link};
 
     #[test]
     fn parses_profile_deep_link() {
         assert_eq!(
             parse_profile_deep_link("starlight://profile/my-profile-123"),
-            Some("my-profile-123".to_string())
+            Some(ProfileDeepLink::Launch("my-profile-123".to_string()))
         );
         // Shell-appended trailing slash.
         assert_eq!(
             parse_profile_deep_link("starlight://profile/my-profile-123/"),
-            Some("my-profile-123".to_string())
+            Some(ProfileDeepLink::Launch("my-profile-123".to_string()))
         );
         assert_eq!(parse_profile_deep_link("starlight://profile/"), None);
         assert_eq!(parse_profile_deep_link("starlight://profile/a/b"), None);
         assert_eq!(parse_profile_deep_link("starlight://other/x"), None);
         assert_eq!(parse_profile_deep_link("--flag"), None);
+    }
+
+    #[test]
+    fn parses_edit_deep_link() {
+        assert_eq!(
+            parse_profile_deep_link("starlight://profile/my-profile-123/edit"),
+            Some(ProfileDeepLink::Edit("my-profile-123".to_string()))
+        );
+        assert_eq!(
+            parse_profile_deep_link("starlight://profile/my-profile-123/edit/"),
+            Some(ProfileDeepLink::Edit("my-profile-123".to_string()))
+        );
+        // Percent-encoded ids decode the same for both forms.
+        assert_eq!(
+            parse_profile_deep_link("starlight://profile/town%20of%20us-1/edit"),
+            Some(ProfileDeepLink::Edit("town of us-1".to_string()))
+        );
+        assert_eq!(parse_profile_deep_link("starlight://profile//edit"), None);
+        assert_eq!(
+            parse_profile_deep_link("starlight://profile/my-profile-123/delete"),
+            None
+        );
     }
 }

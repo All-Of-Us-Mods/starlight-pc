@@ -25,6 +25,8 @@ pub enum BackendEvent {
     /// A second app instance forwarded its startup to us (single-instance
     /// guard) — bring the main window to the front.
     ActivateWindow,
+    /// A `starlight://profile/{id}/edit` deep link asked for a profile's page.
+    OpenProfilePage(String),
 }
 
 const CHANNEL_CAPACITY: usize = 256;
