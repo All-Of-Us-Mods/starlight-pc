@@ -19,7 +19,7 @@ use crate::backend::events::{self, BackendEvent};
 use crate::backend::services::{
     bepinex_service::BepInExTargetType,
     mod_install_service::{self, InstallModInput, ResolvedDependency},
-    profile_service::{self, ProfileEntry},
+    profile_service::{self, ProfileEntry, ProfileIconSelection},
 };
 use crate::theme::ThemeExt;
 use crate::ui::format;
@@ -45,6 +45,8 @@ struct ModDetailData {
 }
 
 struct InstallPanel {
+    /// Set once an existing profile is picked. `None` while the panel is in
+    /// new-profile mode (the default), where the profile is created on install.
     selected_profile_id: Option<String>,
     selected_version: String,
     deps: Vec<DepRow>,
@@ -55,7 +57,6 @@ struct InstallPanel {
 
 struct NewProfileInput {
     name_input: Entity<InputState>,
-    busy: bool,
 }
 
 struct DepRow {
@@ -143,7 +144,7 @@ impl ModDetailView {
         }
     }
 
-    fn open_install_panel(&mut self, cx: &mut Context<Self>) {
+    fn open_install_panel(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         let LoadState::Loaded(data) = &self.state else {
             return;
         };
@@ -152,14 +153,22 @@ impl ModDetailView {
         };
         let mod_id = data.mod_info.id.clone();
         let latest_version = latest.version.clone();
-        let default_profile = self.profiles.first().map(|p| p.id.clone());
+        // Default to a fresh profile named after the mod, so mods stay isolated
+        // from each other unless the user deliberately picks an existing profile.
+        let default_name = unique_profile_name(&data.mod_info.name, &self.profiles);
         self.install = Some(InstallPanel {
-            selected_profile_id: default_profile,
+            selected_profile_id: None,
             selected_version: latest_version.clone(),
             deps: Vec::new(),
             unresolved: Vec::new(),
             status: InstallStatus::Resolving,
-            new_profile: None,
+            new_profile: Some(NewProfileInput {
+                name_input: cx.new(|cx| {
+                    InputState::new(window, cx)
+                        .placeholder("New profile name")
+                        .default_value(default_name)
+                }),
+            }),
         });
         cx.notify();
         self.resolve_for_selected_version(mod_id, latest_version, cx);
@@ -242,13 +251,34 @@ impl ModDetailView {
             return;
         };
         panel.selected_profile_id = Some(profile_id.clone());
+        // Picking an existing profile leaves new-profile mode.
+        panel.new_profile = None;
         let profile = self.profiles.iter().find(|p| p.id == profile_id);
-        for row in &mut panel.deps {
-            let installed =
-                profile.is_some_and(|p| profile_has_mod_at(p, &row.mod_id, &row.resolved_version));
-            row.already_installed = installed;
-            row.checked = !installed;
+        refresh_dep_rows(&mut panel.deps, profile);
+        cx.notify();
+    }
+
+    /// Switch the panel back to "install into a brand new profile" — the default.
+    fn select_new_profile(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        let default_name = match &self.state {
+            LoadState::Loaded(data) => unique_profile_name(&data.mod_info.name, &self.profiles),
+            _ => return,
+        };
+        let Some(panel) = self.install.as_mut() else {
+            return;
+        };
+        panel.selected_profile_id = None;
+        if panel.new_profile.is_none() {
+            panel.new_profile = Some(NewProfileInput {
+                name_input: cx.new(|cx| {
+                    InputState::new(window, cx)
+                        .placeholder("New profile name")
+                        .default_value(default_name)
+                }),
+            });
         }
+        // A new profile starts empty, so nothing is already installed.
+        refresh_dep_rows(&mut panel.deps, None);
         cx.notify();
     }
 
@@ -271,73 +301,6 @@ impl ModDetailView {
         self.resolve_for_selected_version(mod_id, version, cx);
     }
 
-    fn toggle_new_profile(&mut self, window: &mut Window, cx: &mut Context<Self>) {
-        let Some(panel) = self.install.as_mut() else {
-            return;
-        };
-        if panel.new_profile.is_some() {
-            panel.new_profile = None;
-        } else {
-            let name_input =
-                cx.new(|cx| InputState::new(window, cx).placeholder("New profile name"));
-            panel.new_profile = Some(NewProfileInput {
-                name_input,
-                busy: false,
-            });
-        }
-        cx.notify();
-    }
-
-    fn submit_new_profile(&mut self, window: &mut Window, cx: &mut Context<Self>) {
-        let Some(panel) = self.install.as_mut() else {
-            return;
-        };
-        let Some(new_profile) = panel.new_profile.as_mut() else {
-            return;
-        };
-        if new_profile.busy {
-            return;
-        }
-        let name = new_profile.name_input.read(cx).value().to_string();
-        let trimmed = name.trim().to_string();
-        if trimmed.is_empty() {
-            window.push_notification(Notification::warning("Profile name cannot be empty"), cx);
-            return;
-        }
-        new_profile.busy = true;
-        cx.notify();
-
-        cx.spawn(async move |this, cx| {
-            let result = cx
-                .background_executor()
-                .spawn(async move { profile_service::create_profile(&trimmed) })
-                .await;
-            let _ = this.update(cx, |this, cx| {
-                match result {
-                    Ok(profile) => {
-                        this.profiles = profile_service::get_profiles().unwrap_or_default();
-                        if let Some(panel) = this.install.as_mut() {
-                            panel.new_profile = None;
-                        }
-                        // Select the newly created profile (this also re-evaluates
-                        // dep checkboxes against its empty mod list).
-                        this.select_profile(profile.id, cx);
-                    }
-                    Err(e) => {
-                        warn!("create_profile failed: {e}");
-                        if let Some(panel) = this.install.as_mut()
-                            && let Some(np) = panel.new_profile.as_mut()
-                        {
-                            np.busy = false;
-                        }
-                        cx.notify();
-                    }
-                }
-            });
-        })
-        .detach();
-    }
-
     fn toggle_dep(&mut self, ix: usize, checked: bool, cx: &mut Context<Self>) {
         if let Some(panel) = self.install.as_mut()
             && let Some(row) = panel.deps.get_mut(ix)
@@ -351,10 +314,26 @@ impl ModDetailView {
         let Some(panel) = self.install.as_ref() else {
             return;
         };
-        let Some(profile_id) = panel.selected_profile_id.clone() else {
-            window.push_notification(Notification::warning("Pick a profile first"), cx);
-            return;
+        // Either install into the picked profile, or create a new one first.
+        let new_profile_name = match (&panel.selected_profile_id, &panel.new_profile) {
+            (Some(_), _) => None,
+            (None, Some(np)) => {
+                let name = np.name_input.read(cx).value().trim().to_string();
+                if name.is_empty() {
+                    window.push_notification(
+                        Notification::warning("Profile name cannot be empty"),
+                        cx,
+                    );
+                    return;
+                }
+                Some(name)
+            }
+            (None, None) => {
+                window.push_notification(Notification::warning("Pick a profile first"), cx);
+                return;
+            }
         };
+        let existing_profile_id = panel.selected_profile_id.clone();
         let mod_id = match &self.state {
             LoadState::Loaded(data) => data.mod_info.id.clone(),
             _ => return,
@@ -372,13 +351,18 @@ impl ModDetailView {
                 version: d.resolved_version.clone(),
             })
             .collect();
-        items.push(InstallModInput { mod_id, version });
+        items.push(InstallModInput {
+            mod_id: mod_id.clone(),
+            version,
+        });
 
-        let needs_bepinex = self
-            .profiles
-            .iter()
-            .find(|p| p.id == profile_id)
-            .is_none_or(|p| p.bepinex_installed.is_none());
+        // A freshly created profile never has BepInEx yet.
+        let needs_bepinex = existing_profile_id.as_ref().is_none_or(|profile_id| {
+            self.profiles
+                .iter()
+                .find(|p| &p.id == profile_id)
+                .is_none_or(|p| p.bepinex_installed.is_none())
+        });
         if let Some(panel) = self.install.as_mut() {
             panel.status = InstallStatus::Installing {
                 message: if needs_bepinex {
@@ -392,15 +376,64 @@ impl ModDetailView {
         }
         cx.notify();
 
-        let profile_id_for_task = profile_id.clone();
+        let creates_profile = new_profile_name.is_some();
         cx.spawn(async move |this, cx| {
+            // Create the profile up front (and publish its id to the panel) so
+            // BepInEx progress events can be matched against it while installing.
+            let profile_id = match new_profile_name {
+                None => existing_profile_id.unwrap_or_default(),
+                Some(name) => {
+                    let created = cx
+                        .background_executor()
+                        .spawn(async move { profile_service::create_profile(&name) })
+                        .await;
+                    match created {
+                        Ok(profile) => {
+                            let id = profile.id.clone();
+                            let id_for_panel = id.clone();
+                            let _ = this.update(cx, |this, cx| {
+                                this.profiles = profile_service::get_profiles().unwrap_or_default();
+                                if let Some(panel) = this.install.as_mut() {
+                                    panel.selected_profile_id = Some(id_for_panel);
+                                    panel.new_profile = None;
+                                }
+                                cx.notify();
+                            });
+                            id
+                        }
+                        Err(e) => {
+                            warn!("create_profile failed: {e}");
+                            let _ = this.update(cx, |this, cx| {
+                                if let Some(panel) = this.install.as_mut() {
+                                    panel.status = InstallStatus::Failed(e.to_string());
+                                }
+                                cx.notify();
+                            });
+                            return;
+                        }
+                    }
+                }
+            };
+
+            let profile_id_for_task = profile_id.clone();
             let result = cx
                 .background_executor()
                 .spawn(async move {
                     if needs_bepinex {
                         profile_service::install_bepinex_for_profile(&profile_id_for_task)?;
                     }
-                    mod_install_service::install_mods_for_profile(&profile_id_for_task, &items)
+                    mod_install_service::install_mods_for_profile(&profile_id_for_task, &items)?;
+                    // A profile created for this install takes the mod's icon.
+                    // Cosmetic only, so a failure here doesn't fail the install.
+                    if creates_profile
+                        && let Err(e) = profile_service::update_profile_icon(
+                            &profile_id_for_task,
+                            ProfileIconSelection::Mod { mod_id },
+                        )
+                    {
+                        warn!("update_profile_icon failed: {e}");
+                    }
+                    Ok::<(), crate::backend::error::AppError>(())
                 })
                 .await;
             let _ = this.update(cx, |this, cx| {
@@ -453,6 +486,31 @@ fn profile_has_mod_at(profile: &ProfileEntry, mod_id: &str, version: &str) -> bo
         .mods
         .iter()
         .any(|m| m.mod_id == mod_id && m.version == version)
+}
+
+/// `base`, or `base 2`, `base 3`… when profiles with that name already exist —
+/// `create_profile` rejects duplicate names.
+fn unique_profile_name(base: &str, profiles: &[ProfileEntry]) -> String {
+    let base = base.trim();
+    let taken = |name: &str| profiles.iter().any(|p| p.name.eq_ignore_ascii_case(name));
+    if !taken(base) {
+        return base.to_string();
+    }
+    (2..)
+        .map(|n| format!("{base} {n}"))
+        .find(|candidate| !taken(candidate))
+        .unwrap_or_else(|| base.to_string())
+}
+
+/// Re-evaluate dependency checkboxes against the profile now selected
+/// (`None` for a not-yet-created profile, which holds no mods).
+fn refresh_dep_rows(deps: &mut [DepRow], profile: Option<&ProfileEntry>) {
+    for row in deps {
+        let installed =
+            profile.is_some_and(|p| profile_has_mod_at(p, &row.mod_id, &row.resolved_version));
+        row.already_installed = installed;
+        row.checked = !installed && !row.dependency_type.eq_ignore_ascii_case("optional");
+    }
 }
 
 fn dep_row_for(r: ResolvedDependency, profile: Option<&ProfileEntry>) -> DepRow {
@@ -547,11 +605,11 @@ impl Render for ModDetailView {
                     .primary()
                     .icon(Icon::new(AppIcon::Download))
                     .label(format!("Install v{}", latest_version_label))
-                    .on_click(cx.listener(|this, _, _window, cx| {
+                    .on_click(cx.listener(|this, _, window, cx| {
                         if this.install.is_some() {
                             this.close_install_panel(cx);
                         } else {
-                            this.open_install_panel(cx);
+                            this.open_install_panel(window, cx);
                         }
                     }));
 
@@ -785,25 +843,35 @@ fn render_install_panel(
             )
             .into_any_element()
     });
+    let new_selected = panel.selected_profile_id.is_none();
     let new_profile_chip = div()
         .id("install-profile-new")
         .px_3()
         .py_2()
         .rounded_md()
         .border_1()
-        .border_color(theme.border)
-        .bg(theme.background)
+        .border_color(if new_selected {
+            theme.primary
+        } else {
+            theme.border
+        })
+        .bg(if new_selected {
+            theme.hover
+        } else {
+            theme.background
+        })
         .cursor_pointer()
         .child("+ New profile")
         .on_mouse_down(
             MouseButton::Left,
             cx.listener(|this, _, window, cx| {
-                this.toggle_new_profile(window, cx);
+                this.select_new_profile(window, cx);
             }),
         )
         .into_any_element();
-    let profile_chips: Vec<AnyElement> = profile_rows
-        .chain(std::iter::once(new_profile_chip))
+    // New profile first — it's the default.
+    let profile_chips: Vec<AnyElement> = std::iter::once(new_profile_chip)
+        .chain(profile_rows)
         .collect();
 
     let version_rows = versions.iter().enumerate().map(|(ix, v)| {
@@ -836,30 +904,18 @@ fn render_install_panel(
             )
     });
 
+    // The profile is created when Install runs, so this is just its name.
     let new_profile_row = panel.new_profile.as_ref().map(|np| {
-        let busy = np.busy;
         div()
             .flex()
-            .gap_2()
-            .items_center()
-            .child(Input::new(&np.name_input).w(px(220.0)))
+            .flex_col()
+            .gap_1()
+            .child(Input::new(&np.name_input).w(px(220.0)).disabled(busy))
             .child(
-                Button::new("new-profile-create")
-                    .primary()
-                    .label(if busy { "Creating…" } else { "Create" })
-                    .disabled(busy)
-                    .on_click(cx.listener(|this, _, window, cx| {
-                        this.submit_new_profile(window, cx);
-                    })),
-            )
-            .child(
-                Button::new("new-profile-cancel")
-                    .ghost()
-                    .label("Cancel")
-                    .disabled(busy)
-                    .on_click(cx.listener(|this, _, window, cx| {
-                        this.toggle_new_profile(window, cx);
-                    })),
+                div()
+                    .text_xs()
+                    .text_color(theme.text_muted)
+                    .child("Created on install, using this mod's icon"),
             )
     });
 
@@ -920,7 +976,7 @@ fn render_install_panel(
         .primary()
         .icon(Icon::new(AppIcon::Download))
         .label("Install")
-        .disabled(busy || panel.selected_profile_id.is_none())
+        .disabled(busy || (panel.selected_profile_id.is_none() && panel.new_profile.is_none()))
         .on_click(cx.listener(|this, _, window, cx| {
             this.run_install(window, cx);
         }));
@@ -970,4 +1026,39 @@ fn render_install_panel(
                 .child(install_btn),
         )
         .into_any_element()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{ProfileEntry, unique_profile_name};
+
+    fn named(name: &str) -> ProfileEntry {
+        ProfileEntry {
+            id: name.into(),
+            name: name.into(),
+            path: String::new(),
+            created_at: 0,
+            last_launched_at: None,
+            bepinex_installed: None,
+            total_play_time: None,
+            icon_mode: None,
+            custom_icon_extension: None,
+            icon_mod_id: None,
+            mods: vec![],
+        }
+    }
+
+    #[test]
+    fn unique_profile_name_keeps_the_mod_name_when_free() {
+        assert_eq!(
+            unique_profile_name("Town of Us", &[named("Other")]),
+            "Town of Us"
+        );
+    }
+
+    #[test]
+    fn unique_profile_name_suffixes_past_case_insensitive_collisions() {
+        let existing = vec![named("Town of Us"), named("town of us 2")];
+        assert_eq!(unique_profile_name("Town of Us", &existing), "Town of Us 3");
+    }
 }
