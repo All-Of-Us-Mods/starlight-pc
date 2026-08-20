@@ -327,6 +327,108 @@ pub fn add_custom_region(
     Ok(true)
 }
 
+/// The parts of a region a user can change from the Servers page.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct RegionFields {
+    pub name: String,
+    /// Bare host — a scheme is stripped on the way in and back out.
+    pub address: String,
+    pub port: u16,
+    pub dtls: bool,
+}
+
+impl Default for RegionFields {
+    /// What the "add server" dialog starts with — 443 is the usual port for a
+    /// public custom server, and the one the dialog has always defaulted to.
+    fn default() -> Self {
+        Self {
+            name: String::new(),
+            address: String::new(),
+            port: 443,
+            dtls: false,
+        }
+    }
+}
+
+/// Read a region entry's editable fields, for pre-filling the edit dialog.
+pub fn region_fields(region: &Value) -> RegionFields {
+    let server = region
+        .get("Servers")
+        .and_then(Value::as_array)
+        .and_then(|servers| servers.first());
+    let address = server
+        .and_then(|server| server.get("Ip"))
+        .and_then(Value::as_str)
+        .or_else(|| region.get("PingServer").and_then(Value::as_str))
+        .unwrap_or_default();
+    RegionFields {
+        name: region_name(region).to_string(),
+        address: host_of(address).to_string(),
+        port: server
+            .and_then(|server| server.get("Port"))
+            .and_then(Value::as_u64)
+            .unwrap_or(443) as u16,
+        dtls: server
+            .and_then(|server| server.get("UseDtls"))
+            .and_then(Value::as_bool)
+            .unwrap_or(false),
+    }
+}
+
+/// Name of the region already pointing at `address:port`, skipping the row
+/// being edited. Lets the Servers page reject a duplicate while its dialog is
+/// still open, using the same rule [`apply_region_edit`] enforces on save.
+pub fn conflicting_region_name(
+    info: &RegionInfo,
+    skip_index: Option<usize>,
+    address: &str,
+    port: u16,
+) -> Option<String> {
+    let host = host_of(address.trim());
+    info.regions
+        .iter()
+        .enumerate()
+        .find(|(ix, region)| Some(*ix) != skip_index && region_has_server(region, host, port))
+        .map(|(_, region)| region_name(region).to_string())
+}
+
+/// Replace the region at `index` with `fields`, keeping its `TranslateName`
+/// (Among Us uses it for localization, and vanilla regions rely on their own).
+/// In-memory half of [`update_region`], split out so it can be tested without
+/// touching Among Us' region file.
+fn apply_region_edit(info: &mut RegionInfo, index: usize, fields: &RegionFields) -> AppResult<()> {
+    let name = fields.name.trim();
+    if name.is_empty() {
+        return Err(AppError::validation("Server name cannot be empty"));
+    }
+    let host = host_of(fields.address.trim());
+    if host.is_empty() {
+        return Err(AppError::validation("Server address cannot be empty"));
+    }
+    let Some(existing) = info.regions.get(index) else {
+        return Err(AppError::validation("That server is no longer in the list"));
+    };
+    if conflicting_region_name(info, Some(index), host, fields.port).is_some() {
+        return Err(AppError::validation(
+            "Another region already points at that address and port",
+        ));
+    }
+
+    let translate_name = existing
+        .get("TranslateName")
+        .and_then(Value::as_i64)
+        .unwrap_or(CUSTOM_TRANSLATE_NAME);
+    info.regions[index] = build_region(name, host, fields.port, fields.dtls, translate_name);
+    Ok(())
+}
+
+/// Apply an edit to the region at `index` and write the region file back.
+pub fn update_region(index: usize, fields: &RegionFields) -> AppResult<()> {
+    let mut info = read_region_info()?;
+    apply_region_edit(&mut info, index, fields)?;
+    write_region_info(&info)
+}
+
 /// Remove the region with `name`.
 pub fn remove_region(name: &str) -> AppResult<()> {
     let mut info = read_region_info()?;
@@ -372,5 +474,107 @@ fn empty_region_info() -> RegionInfo {
     RegionInfo {
         current_region_idx: 0,
         regions: Vec::new(),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn info_with(regions: Vec<Value>) -> RegionInfo {
+        RegionInfo {
+            current_region_idx: 0,
+            regions,
+        }
+    }
+
+    fn fields(name: &str, address: &str, port: u16) -> RegionFields {
+        RegionFields {
+            name: name.into(),
+            address: address.into(),
+            port,
+            dtls: false,
+        }
+    }
+
+    #[test]
+    fn region_fields_round_trip_through_an_edit() {
+        let region = build_region("AOU Europe", "eu.allofus.dev", 443, true, 1003);
+        let read = region_fields(&region);
+
+        // The stored `Ip` carries a scheme; the editable address does not.
+        assert_eq!(read, {
+            let mut expected = fields("AOU Europe", "eu.allofus.dev", 443);
+            expected.dtls = true;
+            expected
+        });
+    }
+
+    #[test]
+    fn edit_replaces_the_entry_and_keeps_its_translate_name() {
+        // A vanilla region keeps its own localization id, not the custom one.
+        let mut info = info_with(vec![build_region(
+            "North America",
+            "na.mm.among.us",
+            443,
+            true,
+            5,
+        )]);
+
+        apply_region_edit(
+            &mut info,
+            0,
+            &fields("NA (moved)", "https://na2.mm.among.us/", 22023),
+        )
+        .unwrap();
+
+        let edited = region_fields(&info.regions[0]);
+        assert_eq!(edited.name, "NA (moved)");
+        assert_eq!(edited.address, "na2.mm.among.us");
+        assert_eq!(edited.port, 22023);
+        assert!(!edited.dtls);
+        assert_eq!(info.regions[0]["TranslateName"], Value::from(5));
+    }
+
+    #[test]
+    fn conflicting_region_name_names_the_other_row_and_ignores_the_edited_one() {
+        let info = info_with(vec![
+            build_region("One", "one.example.com", 443, false, 1003),
+            build_region("Two", "two.example.com", 443, false, 1003),
+        ]);
+
+        // A scheme on the typed address doesn't hide the conflict.
+        assert_eq!(
+            conflicting_region_name(&info, None, "https://two.example.com/", 443),
+            Some("Two".to_string())
+        );
+        // Re-saving row 1 at its own address isn't a conflict with itself.
+        assert_eq!(
+            conflicting_region_name(&info, Some(1), "two.example.com", 443),
+            None
+        );
+        // Same host, different port is a different server.
+        assert_eq!(
+            conflicting_region_name(&info, None, "two.example.com", 22023),
+            None
+        );
+    }
+
+    #[test]
+    fn edit_rejects_empty_fields_a_missing_row_and_a_duplicate_target() {
+        let mut info = info_with(vec![
+            build_region("One", "one.example.com", 443, false, 1003),
+            build_region("Two", "two.example.com", 443, false, 1003),
+        ]);
+
+        assert!(apply_region_edit(&mut info, 0, &fields("  ", "one.example.com", 443)).is_err());
+        assert!(apply_region_edit(&mut info, 0, &fields("One", "   ", 443)).is_err());
+        assert!(apply_region_edit(&mut info, 9, &fields("One", "one.example.com", 443)).is_err());
+        // Moving "One" onto "Two"'s host:port would leave two rows for one server.
+        assert!(apply_region_edit(&mut info, 0, &fields("One", "two.example.com", 443)).is_err());
+        // Re-saving a row at its own address is fine.
+        assert!(
+            apply_region_edit(&mut info, 0, &fields("One renamed", "one.example.com", 443)).is_ok()
+        );
     }
 }
