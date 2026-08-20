@@ -9,7 +9,7 @@ use gpui::*;
 use log::warn;
 
 use std::collections::HashMap;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::process::Command;
 
 use crate::backend::api;
@@ -23,6 +23,7 @@ use crate::backend::state::game_runtime;
 use crate::backend::state::mod_catalog_cache;
 use crate::settings as app_settings;
 use crate::theme::ThemeExt;
+use crate::ui::file_drop;
 use crate::ui::format;
 use crate::ui::icon::AppIcon;
 use crate::ui::log_panel::LogPanel;
@@ -482,14 +483,40 @@ impl LibraryDetailView {
             multiple: true,
             prompt: Some("Add BepInEx plugin (.dll)".into()),
         });
-        let profile_id = self.profile_id.clone();
         cx.spawn(async move |this, cx| {
             let Ok(Ok(Some(paths))) = receiver.await else {
                 return;
             };
-            if paths.is_empty() {
-                return;
-            }
+            let _ = this.update(cx, |this, cx| this.add_mod_paths(paths, cx));
+        })
+        .detach();
+    }
+
+    /// Plugin .dlls dropped onto this profile's page go straight in — same
+    /// path as the picker above.
+    fn on_drop(&mut self, paths: &[PathBuf], cx: &mut Context<Self>) {
+        let dropped = file_drop::DroppedFiles::classify(paths);
+        if dropped.plugins.is_empty() {
+            self.launch_error = Some(if dropped.archives.is_empty() {
+                "Drop a mod .dll to add it to this profile".to_string()
+            } else {
+                // Importing an archive here would create a second profile,
+                // which is not what dropping it on this page suggests.
+                "Import profile .zips from the Library page".to_string()
+            });
+            self.notice = None;
+            cx.notify();
+            return;
+        }
+        self.add_mod_paths(dropped.plugins.into_iter().map(PathBuf::from).collect(), cx);
+    }
+
+    fn add_mod_paths(&mut self, paths: Vec<PathBuf>, cx: &mut Context<Self>) {
+        if paths.is_empty() {
+            return;
+        }
+        let profile_id = self.profile_id.clone();
+        cx.spawn(async move |this, cx| {
             let result = cx
                 .background_executor()
                 .spawn(async move {
@@ -654,6 +681,14 @@ impl Render for LibraryDetailView {
         page_root("library-detail-page", &theme)
             .gap_4()
             .overflow_y_scroll()
+            // Dropping plugin .dlls anywhere on the page adds them to this profile.
+            .drag_over::<ExternalPaths>({
+                let hover = theme.hover;
+                move |style, _, _, _| style.bg(hover)
+            })
+            .on_drop(cx.listener(|this, dropped: &ExternalPaths, _window, cx| {
+                this.on_drop(dropped.paths(), cx);
+            }))
             .children(self.export_progress.map(|p| {
                 div()
                     .flex()
@@ -1095,7 +1130,7 @@ impl LibraryDetailView {
                     .py_2()
                     .text_sm()
                     .text_color(theme.text_muted)
-                    .child("No mods installed. Install from Explore, or add a BepInEx plugin .dll.")
+                    .child("No mods installed. Install from Explore, or drop a BepInEx plugin .dll here.")
                     .into_any_element()
             } else {
                 div().children(entries).into_any_element()

@@ -302,7 +302,10 @@ fn path_field(
 
         let state_key: SharedString = format!(
             "path-field-{}-{}-{}-{}",
-            key, options.page_ix(), options.group_ix(), options.item_ix()
+            key,
+            options.page_ix(),
+            options.group_ix(),
+            options.item_ix()
         )
         .into();
 
@@ -332,7 +335,10 @@ fn path_field(
         };
         let button_id: SharedString = format!(
             "path-browse-{}-{}-{}-{}",
-            key, options.page_ix(), options.group_ix(), options.item_ix()
+            key,
+            options.page_ix(),
+            options.group_ix(),
+            options.item_ix()
         )
         .into();
         let setter: PathSetter = Rc::new(set);

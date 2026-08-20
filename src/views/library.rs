@@ -1,12 +1,15 @@
 use gpui::*;
 use log::warn;
 
+use std::path::PathBuf;
+
 use crate::backend::events::{self, BackendEvent};
 use crate::backend::services::launch_service;
 use crate::backend::services::profile_service::{self, ProfileEntry, ZipOp};
 use crate::backend::state::game_runtime;
 use crate::settings as app_settings;
 use crate::theme::ThemeExt;
+use crate::ui::file_drop::{self, DroppedFiles};
 use crate::ui::format;
 use crate::ui::icon::AppIcon;
 use crate::ui::profile_icon::profile_icon;
@@ -138,33 +141,116 @@ impl LibraryView {
             multiple: false,
             prompt: Some("Import".into()),
         });
-        self.error = None;
-        cx.notify();
         cx.spawn(async move |this, cx| {
             let Ok(Ok(Some(paths))) = receiver.await else {
                 return;
             };
-            let Some(path) = paths.into_iter().next() else {
-                return;
-            };
-            let path = path.to_string_lossy().into_owned();
-            let _ = this.update(cx, |this, cx| {
-                this.import_progress = Some(0.0);
-                cx.notify();
-            });
-            let result = cx
-                .background_executor()
-                .spawn(async move { profile_service::import_profile_zip(&path) })
-                .await;
+            let paths = paths
+                .into_iter()
+                .map(|path| path.to_string_lossy().into_owned())
+                .collect();
+            let _ = this.update(cx, |this, cx| this.import_archives(paths, cx));
+        })
+        .detach();
+    }
+
+    /// Import profile .zips, one after another so their progress bars don't
+    /// fight over the shared indicator.
+    fn import_archives(&mut self, paths: Vec<String>, cx: &mut Context<Self>) {
+        if paths.is_empty() {
+            return;
+        }
+        self.error = None;
+        self.import_progress = Some(0.0);
+        cx.notify();
+        cx.spawn(async move |this, cx| {
+            for path in paths {
+                let result = cx
+                    .background_executor()
+                    .spawn(async move { profile_service::import_profile_zip(&path) })
+                    .await;
+                if let Err(e) = result {
+                    warn!("import profile zip failed: {e}");
+                    let _ = this.update(cx, |this, cx| {
+                        this.error = Some(format!("Import failed: {e}"));
+                        cx.notify();
+                    });
+                }
+            }
             let _ = this.update(cx, |this, cx| {
                 this.import_progress = None;
+                this.refresh(cx);
+            });
+        })
+        .detach();
+    }
+
+    /// Copy dropped plugin .dlls into `profile_id`'s `BepInEx/plugins`.
+    fn add_plugins_to_profile(
+        &mut self,
+        profile_id: String,
+        paths: Vec<String>,
+        cx: &mut Context<Self>,
+    ) {
+        if paths.is_empty() {
+            return;
+        }
+        self.error = None;
+        cx.notify();
+        cx.spawn(async move |this, cx| {
+            let result = cx
+                .background_executor()
+                .spawn(async move {
+                    let mut added = Vec::new();
+                    for path in paths {
+                        added.push(profile_service::import_mod_to_profile(&profile_id, &path)?);
+                    }
+                    Ok::<_, crate::backend::error::AppError>(added)
+                })
+                .await;
+            let _ = this.update(cx, |this, cx| {
                 if let Err(e) = result {
-                    this.error = Some(format!("Import failed: {e}"));
+                    warn!("add dropped mod failed: {e}");
+                    this.error = Some(format!("Add mod failed: {e}"));
                 }
                 this.refresh(cx);
             });
         })
         .detach();
+    }
+
+    /// Files dropped on the page background: archives import as new profiles,
+    /// but a plugin has no profile to go into from here.
+    fn on_drop_on_page(&mut self, paths: &[PathBuf], cx: &mut Context<Self>) {
+        let dropped = DroppedFiles::classify(paths);
+        if dropped.is_empty() {
+            self.error = Some(file_drop::UNSUPPORTED_DROP.to_string());
+            cx.notify();
+            return;
+        }
+        if !dropped.plugins.is_empty() {
+            self.error = Some("Drop a mod .dll onto a profile to install it".to_string());
+            cx.notify();
+        }
+        self.import_archives(dropped.archives, cx);
+    }
+
+    /// Files dropped on one profile's card: plugins go into that profile,
+    /// archives still import as new profiles.
+    fn on_drop_on_profile(
+        &mut self,
+        profile_id: String,
+        paths: &[PathBuf],
+        cx: &mut Context<Self>,
+    ) {
+        let dropped = DroppedFiles::classify(paths);
+        if dropped.is_empty() {
+            self.error = Some(file_drop::UNSUPPORTED_DROP.to_string());
+            cx.notify();
+            return;
+        }
+        self.add_plugins_to_profile(profile_id, dropped.plugins, cx);
+        self.import_archives(dropped.archives, cx);
     }
 
     fn submit_create(&mut self, name: String, cx: &mut Context<Self>) {
@@ -301,6 +387,8 @@ impl LibraryView {
     ) -> impl IntoElement {
         let id = profile.id.clone();
         let emit_id = id.clone();
+        let drop_id = id.clone();
+        let accent = theme.primary;
         div()
             .id(SharedString::from(id))
             .flex()
@@ -312,6 +400,13 @@ impl LibraryView {
             .border_color(theme.border)
             .cursor_pointer()
             .hover(|s| s.bg(theme.hover))
+            // Dropping a .dll here installs it into this profile.
+            .drag_over::<ExternalPaths>(move |style, _, _, _| style.border_color(accent))
+            .on_drop(
+                cx.listener(move |this, dropped: &ExternalPaths, _window, cx| {
+                    this.on_drop_on_profile(drop_id.clone(), dropped.paths(), cx);
+                }),
+            )
             .on_click(cx.listener(move |_, _: &ClickEvent, _, cx| {
                 cx.emit(LibraryEvent::Open(emit_id.clone()));
             }))
@@ -385,7 +480,7 @@ impl Render for LibraryView {
                 .into_any_element(),
             LoadState::Loaded(profiles) if profiles.is_empty() => div()
                 .text_color(theme.text_muted)
-                .child("No profiles yet. Click \"Create Profile\" to make one.")
+                .child("No profiles yet. Click \"Create Profile\" to make one, or drop an exported profile .zip here.")
                 .into_any_element(),
             LoadState::Loaded(profiles) => {
                 let cards: Vec<AnyElement> = profiles
@@ -473,6 +568,15 @@ impl Render for LibraryView {
         crate::views::page_root("library-page", &theme)
             .relative()
             .overflow_y_scroll()
+            // Dropping an exported profile .zip anywhere on the page imports it.
+            // Cards handle their own drops first (the listener consumes the drag).
+            .drag_over::<ExternalPaths>({
+                let hover = theme.hover;
+                move |style, _, _, _| style.bg(hover)
+            })
+            .on_drop(cx.listener(|this, dropped: &ExternalPaths, _window, cx| {
+                this.on_drop_on_page(dropped.paths(), cx);
+            }))
             .child(self.render_header(cx))
             .children(setup_banner)
             .children(self.error.clone().map(|message| {
