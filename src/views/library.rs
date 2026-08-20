@@ -36,6 +36,11 @@ pub struct LibraryView {
     stoppable_count: usize,
     /// 0–100 while a profile import is running; `None` otherwise.
     import_progress: Option<f64>,
+    /// Bumped per profile-list load. Concurrent work (a mixed drop installs a
+    /// plugin and imports an archive at once) refreshes more than once, and the
+    /// reads can finish out of order — a load only applies if it's still the
+    /// newest one, so an older snapshot can't hide a just-imported profile.
+    load_generation: u64,
 }
 
 enum LoadState {
@@ -47,13 +52,14 @@ enum LoadState {
 impl LibraryView {
     pub fn new(_window: &mut Window, cx: &mut Context<Self>) -> Self {
         let initial = game_runtime::current_state();
-        let view = Self {
+        let mut view = Self {
             state: LoadState::Loading,
             create_dialog: None,
             error: None,
             running_count: initial.running_count,
             stoppable_count: initial.stoppable_running_count,
             import_progress: None,
+            load_generation: 0,
         };
         view.load_profiles(cx);
 
@@ -90,13 +96,20 @@ impl LibraryView {
 
     /// Fetch profiles on the background executor and replace `state`. They
     /// arrive already sorted (last launched first) from `get_profiles`.
-    fn load_profiles(&self, cx: &mut Context<Self>) {
+    fn load_profiles(&mut self, cx: &mut Context<Self>) {
+        self.load_generation = self.load_generation.wrapping_add(1);
+        let generation = self.load_generation;
         cx.spawn(async move |this, cx| {
             let result = cx
                 .background_executor()
                 .spawn(async { profile_service::get_profiles() })
                 .await;
             let _ = this.update(cx, |this, cx| {
+                // A load started after this one has a fresher snapshot; drop
+                // ours rather than overwriting it.
+                if generation != this.load_generation {
+                    return;
+                }
                 this.state = match result {
                     Ok(profiles) => LoadState::Loaded(profiles),
                     Err(e) => {
@@ -149,7 +162,10 @@ impl LibraryView {
                 .into_iter()
                 .map(|path| path.to_string_lossy().into_owned())
                 .collect();
-            let _ = this.update(cx, |this, cx| this.import_archives(paths, cx));
+            let _ = this.update(cx, |this, cx| {
+                this.error = None;
+                this.import_archives(paths, cx);
+            });
         })
         .detach();
     }
@@ -160,7 +176,8 @@ impl LibraryView {
         if paths.is_empty() {
             return;
         }
-        self.error = None;
+        // Deliberately not clearing `error`: a mixed drop sets a warning about
+        // the files this import ignores, and it has to survive.
         self.import_progress = Some(0.0);
         cx.notify();
         cx.spawn(async move |this, cx| {
@@ -195,7 +212,6 @@ impl LibraryView {
         if paths.is_empty() {
             return;
         }
-        self.error = None;
         cx.notify();
         cx.spawn(async move |this, cx| {
             let result = cx
@@ -223,6 +239,8 @@ impl LibraryView {
     /// but a plugin has no profile to go into from here.
     fn on_drop_on_page(&mut self, paths: &[PathBuf], cx: &mut Context<Self>) {
         let dropped = DroppedFiles::classify(paths);
+        // Whatever the last drop said no longer applies.
+        self.error = None;
         if dropped.is_empty() {
             self.error = Some(file_drop::UNSUPPORTED_DROP.to_string());
             cx.notify();
@@ -230,8 +248,8 @@ impl LibraryView {
         }
         if !dropped.plugins.is_empty() {
             self.error = Some("Drop a mod .dll onto a profile to install it".to_string());
-            cx.notify();
         }
+        cx.notify();
         self.import_archives(dropped.archives, cx);
     }
 
@@ -244,6 +262,7 @@ impl LibraryView {
         cx: &mut Context<Self>,
     ) {
         let dropped = DroppedFiles::classify(paths);
+        self.error = None;
         if dropped.is_empty() {
             self.error = Some(file_drop::UNSUPPORTED_DROP.to_string());
             cx.notify();
