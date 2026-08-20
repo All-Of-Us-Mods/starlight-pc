@@ -8,7 +8,7 @@
 use gpui::*;
 use gpui_component::Sizable as _;
 use gpui_component::button::{Button, ButtonVariants};
-use gpui_component::input::{Input, InputEvent, InputState};
+use gpui_component::input::{Editor, EditorState, Input, InputEvent, InputState};
 
 use crate::theme::ThemeExt;
 
@@ -122,7 +122,7 @@ impl LogFilters {
 
 pub struct LogPanel {
     filter_input: Entity<InputState>,
-    view_input: Entity<InputState>,
+    view_input: Entity<EditorState>,
     /// Last string we pushed into `view_input`. We diff against this so we
     /// don't clobber the user's selection on every render tick.
     view_cache: String,
@@ -146,9 +146,8 @@ impl LogPanel {
         // (see `ui::log_language::register`). Highlights the `[Level: …]`
         // prefix per log level.
         let view_input = cx.new(|cx| {
-            InputState::new(window, cx)
-                .code_editor("log")
-                .multi_line(true)
+            EditorState::new(window, cx)
+                .language("log")
                 .line_number(false)
                 .folding(false)
         });
@@ -275,7 +274,11 @@ impl Render for LogPanel {
             )
             .child(
                 div().h(px(320.0)).child(
-                    Input::new(&self.view_input)
+                    // Read-only: this is a log viewer, and the text is
+                    // rewritten from the log file on every refresh — typing
+                    // into it would only be undone. `set_value` still applies.
+                    Editor::new(&self.view_input)
+                        .readonly(true)
                         .font_family("ui-monospace, monospace")
                         .size_full(),
                 ),

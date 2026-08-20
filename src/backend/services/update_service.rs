@@ -184,7 +184,7 @@ fn hash_file_sha256(path: &std::path::Path) -> AppResult<String> {
         }
         hasher.update(&chunk[..n]);
     }
-    Ok(format!("{:x}", hasher.finalize()))
+    Ok(crate::backend::services::hex_digest(hasher.finalize()))
 }
 
 #[cfg(test)]

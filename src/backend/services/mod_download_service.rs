@@ -125,7 +125,7 @@ fn stream_and_verify(
     drop(file);
 
     emit_progress(mod_id, downloaded, total_size, "verifying");
-    let computed_checksum = format!("{:x}", hasher.finalize());
+    let computed_checksum = crate::backend::services::hex_digest(hasher.finalize());
     if let Some(expected_checksum) = expected_checksum.filter(|checksum| !checksum.is_empty())
         && computed_checksum != expected_checksum.to_lowercase()
     {

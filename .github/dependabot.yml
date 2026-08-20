@@ -1,0 +1,24 @@
+version: 2
+updates:
+  - package-ecosystem: cargo
+    directory: /
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+    groups:
+      # One PR for the routine churn; majors still come in on their own,
+      # since those are the ones that need code changes.
+      cargo-minor-and-patch:
+        update-types:
+          - minor
+          - patch
+
+  # Workflow actions (checkout, rust-cache, install-nix, gh-release, …).
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    groups:
+      github-actions:
+        patterns:
+          - "*"
