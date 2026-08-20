@@ -19,10 +19,15 @@ use crate::backend::services::{launch_service, region_service};
 use crate::backend::state::game_runtime::{self, GameStatePayload};
 use crate::backend::state::mod_catalog_cache;
 use crate::theme::{Theme, ThemeExt};
-use crate::views::{modal_overlay, page_root, section_label};
+use crate::views::{page_root, section_label};
+use gpui_component::alert::Alert;
 use gpui_component::button::{Button, ButtonVariants};
+use gpui_component::clipboard::Clipboard;
+use gpui_component::dialog::{DialogAction, DialogClose, DialogFooter};
+use gpui_component::radio::Radio;
 use gpui_component::skeleton::Skeleton;
-use gpui_component::{Disableable, Icon, IconName, Sizable};
+use gpui_component::tag::Tag;
+use gpui_component::{Disableable, Icon, IconName, Sizable, WindowExt};
 
 /// How often the lobby list re-polls every enabled region.
 const REFRESH_INTERVAL_SECS: u64 = 12;
@@ -330,7 +335,7 @@ impl LobbiesView {
         .detach();
     }
 
-    fn open_launch_dialog(&mut self, lobby: LobbyRow, cx: &mut Context<Self>) {
+    fn open_launch_dialog(&mut self, lobby: LobbyRow, window: &mut Window, cx: &mut Context<Self>) {
         // Preselect the most-recently-launched profile that already has every
         // required mod installed (`self.profiles` is sorted last-launched
         // first); otherwise fall back to the most-recently-launched profile,
@@ -350,16 +355,83 @@ impl LobbiesView {
             error: None,
         });
         self.notice = None;
+        let view = cx.entity();
+        window.open_dialog(cx, move |dialog, _window, cx| {
+            let view = view.clone();
+            // The dialog lives in the window's dialog layer and is rebuilt
+            // every frame, so its state is read back out of the view here
+            // instead of being captured when it opened.
+            let Some((code, busy)) = view.read(cx).launch_dialog.as_ref().map(|state| {
+                (
+                    state
+                        .lobby
+                        .game
+                        .code
+                        .clone()
+                        .unwrap_or_else(|| "------".to_string()),
+                    state.busy,
+                )
+            }) else {
+                return dialog;
+            };
+            let body = launch_dialog_body(&view, cx);
+            let on_ok = view.clone();
+            let on_close = view.clone();
+            dialog
+                .title(format!("Launch into lobby {code}"))
+                .w(px(460.0))
+                // A launch in flight can't be cancelled, so every way out of
+                // the dialog is closed off until it finishes or fails.
+                .close_button(!busy)
+                .overlay_closable(!busy)
+                .keyboard(!busy)
+                .child(body)
+                .footer(
+                    DialogFooter::new()
+                        .child(if busy {
+                            Button::new("launch-cancel")
+                                .label("Cancel")
+                                .disabled(true)
+                                .into_any_element()
+                        } else {
+                            DialogClose::new()
+                                .child(Button::new("launch-cancel").label("Cancel"))
+                                .into_any_element()
+                        })
+                        .child(
+                            DialogAction::new().child(
+                                Button::new("launch-confirm")
+                                    .primary()
+                                    .icon(Icon::new(IconName::Play))
+                                    .label(if busy { "Launching…" } else { "Launch" })
+                                    .disabled(busy),
+                            ),
+                        ),
+                )
+                // The launch is asynchronous: the dialog stays up (showing
+                // progress, or a failure) until `submit_launch` closes it.
+                .on_ok(move |_, window, cx| {
+                    on_ok.update(cx, |this, cx| this.submit_launch(window, cx));
+                    false
+                })
+                .on_close(move |_, _window, cx| {
+                    on_close.update(cx, |this, cx| {
+                        this.launch_dialog = None;
+                        cx.notify();
+                    });
+                })
+        });
         cx.notify();
     }
 
-    fn submit_launch(&mut self, cx: &mut Context<Self>) {
+    fn submit_launch(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         let Some(dialog) = self.launch_dialog.as_mut() else {
             return;
         };
         if dialog.busy {
             return;
         }
+        let window_handle = window.window_handle();
         dialog.busy = true;
         dialog.error = None;
         let lobby = dialog.lobby.clone();
@@ -429,6 +501,7 @@ impl LobbiesView {
                 })
                 .await;
 
+            let launched = outcome.is_ok();
             let _ = this.update(cx, |this, cx| {
                 match outcome {
                     Ok(summary) => {
@@ -471,6 +544,11 @@ impl LobbiesView {
                 }
                 cx.notify();
             });
+            // The dialog itself lives in the window, so dismissing it takes a
+            // window update rather than just clearing `launch_dialog`.
+            if launched {
+                let _ = window_handle.update(cx, |_, window, cx| window.close_dialog(cx));
+            }
         })
         .detach();
     }
@@ -489,15 +567,12 @@ impl LobbiesView {
                         .into_any_element()
                 }))
                 .into_any_element(),
-            LoadState::RegionsUnavailable(reason) => div()
-                .flex()
-                .flex_col()
-                .gap_1()
-                .text_sm()
-                .text_color(theme.text_muted)
-                .child(format!("Could not read your Among Us regions: {reason}"))
-                .child("Add a region on the Servers tab to browse its lobbies.")
-                .into_any_element(),
+            LoadState::RegionsUnavailable(reason) => Alert::warning(
+                "lobbies-regions-unavailable",
+                format!("{reason} Add a region on the Servers tab to browse its lobbies."),
+            )
+            .title("Could not read your Among Us regions")
+            .into_any_element(),
             LoadState::Loaded(rows) if rows.is_empty() => div()
                 .text_sm()
                 .text_color(theme.text_muted)
@@ -605,243 +680,223 @@ impl LobbiesView {
                         s.child(mod_chip_row(&game.mods, theme))
                     }),
             )
-            .child(
-                Button::new(SharedString::from(format!("copy-code-{ix}")))
-                    .ghost()
-                    .xsmall()
-                    .icon(Icon::new(IconName::Copy))
-                    .label("Copy")
-                    .disabled(code.is_empty())
-                    .on_click(cx.listener(move |this, _, _window, cx| {
-                        this.copy_code(copy_code.clone(), cx);
-                        this.notice = Some("Code copied to clipboard.".into());
-                        cx.notify();
-                    })),
-            )
+            // Nothing to copy for a lobby the server didn't give a code.
+            .children((!copy_code.is_empty()).then(|| {
+                // `Clipboard::on_copied` hands the value over by move, so it
+                // can't go through `cx.listener` (which takes events by ref).
+                let view = cx.entity();
+                Clipboard::new(SharedString::from(format!("copy-code-{ix}")))
+                    .value(copy_code.clone())
+                    .tooltip("Copy join code")
+                    .on_copied(move |_, _window, cx| {
+                        view.update(cx, |this, cx| {
+                            this.notice = Some("Code copied to clipboard.".into());
+                            cx.notify();
+                        });
+                    })
+            }))
             .child(
                 Button::new(SharedString::from(format!("launch-lobby-{ix}")))
                     .primary()
                     .xsmall()
                     .icon(Icon::new(IconName::Play))
                     .label("Launch")
-                    .on_click(cx.listener(move |this, _, _window, cx| {
-                        this.open_launch_dialog(row_for_launch.clone(), cx)
+                    .on_click(cx.listener(move |this, _, window, cx| {
+                        this.open_launch_dialog(row_for_launch.clone(), window, cx)
                     })),
             )
             .into_any_element()
     }
+}
 
-    fn render_launch_dialog(&self, theme: &Theme, cx: &mut Context<Self>) -> Option<AnyElement> {
-        let dialog = self.launch_dialog.as_ref()?;
-        let game = &dialog.lobby.game;
-        let code = game.code.clone().unwrap_or_else(|| "------".to_string());
-        let required_mods = &game.mods;
-        let no_mods: Vec<ProfileModEntry> = Vec::new();
+/// Body of the launch dialog — the region line, the profile picker and the
+/// lobby's required mods. Built from the view's `launch_dialog` state, which
+/// the dialog layer re-reads on every frame.
+fn launch_dialog_body(view: &Entity<LobbiesView>, cx: &App) -> AnyElement {
+    let theme = cx.theme().clone();
+    let this = view.read(cx);
+    let Some(dialog) = this.launch_dialog.as_ref() else {
+        return div().into_any_element();
+    };
+    let required_mods = &dialog.lobby.game.mods;
+    let no_mods: Vec<ProfileModEntry> = Vec::new();
 
-        let mut option_rows: Vec<AnyElement> = self
-            .profiles
-            .iter()
-            .map(|p| {
-                let bep_subtitle = if p.bepinex_installed.is_some() {
-                    "Modded profile"
-                } else {
-                    "BepInEx will be installed"
-                };
-                let preview = preview_mod_installs(required_mods, &p.mods);
-                let (detail, detail_color) = install_summary(&preview, theme);
-                self.render_target_option(
-                    TargetOption {
-                        target: LaunchTarget::Existing(p.id.clone()),
-                        title: &p.name,
-                        subtitle: bep_subtitle,
-                        detail: &detail,
-                        detail_color,
-                    },
-                    &dialog.target,
-                    theme,
-                    cx,
-                )
-            })
-            .collect();
-        let temp_preview = preview_mod_installs(required_mods, &no_mods);
-        let (temp_detail, temp_detail_color) = install_summary(&temp_preview, theme);
-        option_rows.push(self.render_target_option(
-            TargetOption {
-                target: LaunchTarget::Temporary,
-                title: "Temporary profile",
-                subtitle: "Fresh profile, deleted automatically once the game closes",
-                detail: &temp_detail,
-                detail_color: temp_detail_color,
-            },
-            &dialog.target,
-            theme,
-            cx,
-        ));
+    let mut option_rows: Vec<AnyElement> = this
+        .profiles
+        .iter()
+        .map(|p| {
+            let bep_subtitle = if p.bepinex_installed.is_some() {
+                "Modded profile"
+            } else {
+                "BepInEx will be installed"
+            };
+            let preview = preview_mod_installs(required_mods, &p.mods);
+            let (detail, detail_color) = install_summary(&preview, &theme);
+            render_target_option(
+                view,
+                TargetOption {
+                    target: LaunchTarget::Existing(p.id.clone()),
+                    title: &p.name,
+                    subtitle: bep_subtitle,
+                    detail: &detail,
+                    detail_color,
+                },
+                &dialog.target,
+                &theme,
+            )
+        })
+        .collect();
+    let temp_preview = preview_mod_installs(required_mods, &no_mods);
+    let (temp_detail, temp_detail_color) = install_summary(&temp_preview, &theme);
+    option_rows.push(render_target_option(
+        view,
+        TargetOption {
+            target: LaunchTarget::Temporary,
+            title: "Temporary profile",
+            subtitle: "Fresh profile, deleted automatically once the game closes",
+            detail: &temp_detail,
+            detail_color: temp_detail_color,
+        },
+        &dialog.target,
+        &theme,
+    ));
 
-        let mut items: Vec<AnyElement> = vec![
-            div()
-                .font_weight(FontWeight::SEMIBOLD)
-                .child(format!("Launch into lobby {code}"))
-                .into_any_element(),
+    let mut items: Vec<AnyElement> = vec![
+        div()
+            .text_xs()
+            .text_color(theme.text_muted)
+            .child(format!("Region: {}", dialog.lobby.region_label))
+            .into_any_element(),
+        section_label("Profile", &theme).into_any_element(),
+        div()
+            .id("launch-profile-list")
+            .flex()
+            .flex_col()
+            .gap_2()
+            .max_h(px(220.0))
+            .overflow_y_scroll()
+            .children(option_rows)
+            .into_any_element(),
+    ];
+    if required_mods.is_empty() {
+        items.push(
             div()
                 .text_xs()
                 .text_color(theme.text_muted)
-                .child(format!("Region: {}", dialog.lobby.region_label))
-                .into_any_element(),
-        ];
-        items.push(section_label("Profile", theme).into_any_element());
-        items.push(
-            div()
-                .id("launch-profile-list")
-                .flex()
-                .flex_col()
-                .gap_2()
-                .max_h(px(220.0))
-                .overflow_y_scroll()
-                .children(option_rows)
+                .child("No mods required.")
                 .into_any_element(),
         );
-        if required_mods.is_empty() {
-            items.push(
-                div()
-                    .text_xs()
-                    .text_color(theme.text_muted)
-                    .child("No mods required.")
-                    .into_any_element(),
-            );
-        } else {
-            items.push(section_label("Required mods", theme).into_any_element());
-            items.push(mod_chip_row(required_mods, theme));
-        }
-        if let Some(err) = &dialog.error {
-            items.push(
-                div()
-                    .text_xs()
-                    .text_color(theme.danger)
-                    .child(err.clone())
-                    .into_any_element(),
-            );
-        }
+    } else {
+        items.push(section_label("Required mods", &theme).into_any_element());
+        items.push(mod_chip_row(required_mods, &theme));
+    }
+    if let Some(err) = &dialog.error {
         items.push(
-            div()
-                .flex()
-                .gap_2()
-                .justify_end()
-                .child(
-                    Button::new("launch-cancel")
-                        .label("Cancel")
-                        .disabled(dialog.busy)
-                        .on_click(cx.listener(|this, _, _window, cx| {
-                            this.launch_dialog = None;
-                            cx.notify();
-                        })),
-                )
-                .child(
-                    Button::new("launch-confirm")
-                        .primary()
-                        .icon(Icon::new(IconName::Play))
-                        .label(if dialog.busy {
-                            "Launching…"
-                        } else {
-                            "Launch"
-                        })
-                        .disabled(dialog.busy)
-                        .on_click(cx.listener(|this, _, _window, cx| this.submit_launch(cx))),
-                )
+            Alert::error("launch-error", err.clone())
+                .small()
                 .into_any_element(),
         );
-
-        Some(modal_overlay(theme, px(460.0), items).into_any_element())
     }
 
-    fn render_target_option(
-        &self,
-        option: TargetOption,
-        selected: &LaunchTarget,
-        theme: &Theme,
-        cx: &mut Context<Self>,
-    ) -> AnyElement {
-        let TargetOption {
-            target,
-            title,
-            subtitle,
-            detail,
-            detail_color,
-        } = option;
-        let is_selected = &target == selected;
-        let id = match &target {
-            LaunchTarget::Existing(pid) => format!("target-{pid}"),
-            LaunchTarget::Temporary => "target-temporary".to_string(),
-        };
-        let border = if is_selected {
-            theme.primary
-        } else {
-            theme.border
-        };
-        let pick = target.clone();
-        div()
-            .id(SharedString::from(id))
-            .flex()
-            .items_center()
-            .gap_3()
-            .px_3()
-            .py_2()
-            .rounded_lg()
-            .bg(theme.background)
-            .border_1()
-            .border_color(border)
-            .cursor_pointer()
-            .hover(|s| s.bg(theme.hover))
-            .on_click(cx.listener(move |this, _, _window, cx| {
+    div()
+        .flex()
+        .flex_col()
+        .gap_3()
+        .children(items)
+        .into_any_element()
+}
+
+/// One row of the launch dialog's profile picker: a radio plus the profile's
+/// name, BepInEx state and mod-install preview.
+fn render_target_option(
+    view: &Entity<LobbiesView>,
+    option: TargetOption,
+    selected: &LaunchTarget,
+    theme: &Theme,
+) -> AnyElement {
+    let TargetOption {
+        target,
+        title,
+        subtitle,
+        detail,
+        detail_color,
+    } = option;
+    let is_selected = &target == selected;
+    let id = match &target {
+        LaunchTarget::Existing(pid) => format!("target-{pid}"),
+        LaunchTarget::Temporary => "target-temporary".to_string(),
+    };
+    let border = if is_selected {
+        theme.primary
+    } else {
+        theme.border
+    };
+    // The whole row is the hit target, and so is the radio inside it (which
+    // would otherwise swallow clicks aimed straight at it).
+    let pick = move |view: &Entity<LobbiesView>, target: &LaunchTarget| {
+        let view = view.clone();
+        let target = target.clone();
+        move |cx: &mut App| {
+            let target = target.clone();
+            view.update(cx, |this, cx| {
                 if let Some(d) = this.launch_dialog.as_mut() {
-                    d.target = pick.clone();
+                    d.target = target;
                 }
                 cx.notify();
-            }))
-            .child(
-                // Radio indicator.
-                div()
-                    .size(px(14.0))
-                    .rounded_full()
-                    .border_1()
-                    .border_color(if is_selected {
-                        theme.primary
-                    } else {
-                        theme.text_muted
-                    })
-                    .when(is_selected, |s| s.bg(theme.primary)),
-            )
-            .child(
-                div()
-                    .flex_1()
-                    .min_w_0()
-                    .flex()
-                    .flex_col()
-                    .child(
-                        div()
-                            .truncate()
-                            .font_weight(FontWeight::MEDIUM)
-                            .child(title.to_string()),
-                    )
-                    .child(
+            });
+        }
+    };
+    let on_row_click = pick(view, &target);
+    let on_radio_click = pick(view, &target);
+    div()
+        .id(SharedString::from(id.clone()))
+        .flex()
+        .items_center()
+        .gap_3()
+        .px_3()
+        .py_2()
+        .rounded_lg()
+        .bg(theme.background)
+        .border_1()
+        .border_color(border)
+        .cursor_pointer()
+        .hover(|s| s.bg(theme.hover))
+        .on_click(move |_, _window, cx| on_row_click(cx))
+        .child(
+            Radio::new(SharedString::from(format!("{id}-radio")))
+                .checked(is_selected)
+                .on_click(move |_, _window, cx| on_radio_click(cx)),
+        )
+        .child(
+            div()
+                .flex_1()
+                .min_w_0()
+                .flex()
+                .flex_col()
+                .child(
+                    div()
+                        .truncate()
+                        .font_weight(FontWeight::MEDIUM)
+                        .child(title.to_string()),
+                )
+                .child(
+                    div()
+                        .truncate()
+                        .text_xs()
+                        .text_color(theme.text_muted)
+                        .child(subtitle.to_string()),
+                )
+                .when(!detail.is_empty(), |s| {
+                    s.child(
                         div()
                             .truncate()
                             .text_xs()
-                            .text_color(theme.text_muted)
-                            .child(subtitle.to_string()),
+                            .text_color(detail_color)
+                            .child(detail.to_string()),
                     )
-                    .when(!detail.is_empty(), |s| {
-                        s.child(
-                            div()
-                                .truncate()
-                                .text_xs()
-                                .text_color(detail_color)
-                                .child(detail.to_string()),
-                        )
-                    }),
-            )
-            .into_any_element()
-    }
+                }),
+        )
+        .into_any_element()
 }
 
 impl Render for LobbiesView {
@@ -879,11 +934,14 @@ impl Render for LobbiesView {
                             .child("Open games on your enabled regions that publish a public lobby list. Launch in, then paste the copied code in-game."),
                     ),
             )
-            .children(
-                self.notice
-                    .clone()
-                    .map(|message| div().text_sm().text_color(theme.success).child(message)),
-            )
+            .children(self.notice.clone().map(|message| {
+                Alert::success("lobbies-notice", message).on_close(cx.listener(
+                    |this, _, _window, cx| {
+                        this.notice = None;
+                        cx.notify();
+                    },
+                ))
+            }))
             .child(
                 div()
                     .flex()
@@ -892,7 +950,6 @@ impl Render for LobbiesView {
                     .child(section_label("Active lobbies", &theme))
                     .child(self.render_lobbies(&theme, cx)),
             )
-            .children(self.render_launch_dialog(&theme, cx))
     }
 }
 
@@ -941,22 +998,14 @@ fn render_mod_chip(lobby_mod: &LobbyMod, theme: &Theme) -> AnyElement {
             .into_any_element(),
     };
 
-    div()
-        .flex()
-        .items_center()
-        .gap_1()
-        .px_2()
-        .py_1()
-        .rounded_md()
-        .bg(theme.background)
-        .border_1()
-        .border_color(theme.border)
+    Tag::secondary()
+        .small()
+        .outline()
         .child(icon)
         .child(
             div()
                 .max_w(px(160.0))
                 .truncate()
-                .text_xs()
                 .text_color(theme.text_muted)
                 .child(label),
         )

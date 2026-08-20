@@ -5,6 +5,7 @@
 
 mod icon_dialog;
 
+use gpui::prelude::FluentBuilder as _;
 use gpui::*;
 use log::warn;
 
@@ -29,14 +30,17 @@ use crate::ui::icon::AppIcon;
 use crate::ui::log_panel::LogPanel;
 use crate::ui::profile_icon::profile_icon;
 use crate::views::page_root;
-use gpui_component::button::{Button, ButtonVariants};
+use gpui_component::alert::Alert;
+use gpui_component::avatar::Avatar;
+use gpui_component::button::{Button, ButtonVariant, ButtonVariants};
+use gpui_component::dialog::{DialogAction, DialogButtonProps, DialogClose, DialogFooter};
 use gpui_component::input::{Input, InputEvent, InputState};
 use gpui_component::progress::Progress;
 use gpui_component::skeleton::Skeleton;
 use gpui_component::switch::Switch;
-use gpui_component::{Disableable, Icon, IconName, Sizable};
+use gpui_component::{Disableable, Icon, IconName, Sizable, WindowExt};
 
-use icon_dialog::{IconDialogState, render_icon_dialog};
+use icon_dialog::IconDialogState;
 
 #[derive(Clone, Debug)]
 pub enum LibraryDetailEvent {
@@ -51,10 +55,6 @@ pub struct LibraryDetailView {
     pub(super) profile_id: String,
     pub(super) state: LoadState,
     bep_progress: Option<BepInExProgress>,
-    confirming_delete: bool,
-    /// Mod id awaiting delete confirmation, if any (two-step like the profile
-    /// delete, but per row).
-    confirming_delete_mod: Option<String>,
     launch_error: Option<String>,
     /// Success/info message (e.g. "Exported profile to …"); rendered non-red.
     notice: Option<String>,
@@ -89,8 +89,6 @@ impl LibraryDetailView {
             profile_id: profile_id.clone(),
             state: LoadState::Loading,
             bep_progress: None,
-            confirming_delete: false,
-            confirming_delete_mod: None,
             launch_error: None,
             notice: None,
             rename_dialog: None,
@@ -316,8 +314,41 @@ impl LibraryDetailView {
         .detach();
     }
 
+    /// Ask before removing a mod from the profile — deleting its files can't
+    /// be undone from here.
+    fn confirm_delete_mod(
+        &mut self,
+        mod_id: String,
+        display: String,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
+        let view = cx.entity();
+        window.open_alert_dialog(cx, move |alert, _window, cx| {
+            let view = view.clone();
+            let mod_id = mod_id.clone();
+            alert
+                .icon(Icon::new(IconName::TriangleAlert).text_color(cx.theme().danger))
+                .title("Remove mod")
+                .description(format!(
+                    "Remove \"{display}\" from this profile? Its files are deleted from disk."
+                ))
+                .button_props(
+                    DialogButtonProps::default()
+                        .ok_variant(ButtonVariant::Danger)
+                        .ok_text("Remove")
+                        .cancel_text("Cancel")
+                        .show_cancel(true),
+                )
+                .on_ok(move |_, _window, cx| {
+                    let mod_id = mod_id.clone();
+                    view.update(cx, |this, cx| this.delete_mod(mod_id, cx));
+                    true
+                })
+        });
+    }
+
     fn delete_mod(&mut self, mod_id: String, cx: &mut Context<Self>) {
-        self.confirming_delete_mod = None;
         // Optimistically drop the row; the reload afterwards confirms it (or
         // brings it back if the on-disk op failed).
         if let LoadState::Loaded(profile) = &mut self.state {
@@ -405,6 +436,37 @@ impl LibraryDetailView {
         .detach();
     }
 
+    /// Deleting a profile wipes its mods and logs, so it goes through a
+    /// confirmation first.
+    fn confirm_delete_profile(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        let name = match &self.state {
+            LoadState::Loaded(profile) => profile.name.clone(),
+            _ => "this profile".to_string(),
+        };
+        let view = cx.entity();
+        window.open_alert_dialog(cx, move |alert, _window, cx| {
+            let view = view.clone();
+            alert
+                .icon(Icon::new(IconName::TriangleAlert).text_color(cx.theme().danger))
+                .title("Delete profile")
+                .description(format!(
+                    "Delete \"{name}\"? Its mods and logs are removed from disk. \
+                     This can't be undone."
+                ))
+                .button_props(
+                    DialogButtonProps::default()
+                        .ok_variant(ButtonVariant::Danger)
+                        .ok_text("Delete")
+                        .cancel_text("Cancel")
+                        .show_cancel(true),
+                )
+                .on_ok(move |_, _window, cx| {
+                    view.update(cx, |this, cx| this.delete_profile(cx));
+                    true
+                })
+        });
+    }
+
     fn delete_profile(&mut self, cx: &mut Context<Self>) {
         let id = self.profile_id.clone();
         cx.spawn(async move |this, cx| {
@@ -415,7 +477,7 @@ impl LibraryDetailView {
             let _ = this.update(cx, |this, cx| {
                 if let Err(e) = result {
                     warn!("delete_profile failed: {e}");
-                    this.confirming_delete = false;
+                    this.launch_error = Some(format!("Delete failed: {e}"));
                     cx.notify();
                 } else {
                     cx.emit(LibraryDetailEvent::Close);
@@ -439,14 +501,57 @@ impl LibraryDetailView {
         cx.subscribe_in(
             &state,
             window,
-            |this, state, event: &InputEvent, _window, cx| {
+            |this, state, event: &InputEvent, window, cx| {
                 if let InputEvent::PressEnter { .. } = event {
-                    this.submit_rename(state.read(cx).value().to_string(), cx);
+                    let name = state.read(cx).value().to_string();
+                    this.submit_rename(name, cx);
+                    // An empty name is rejected and leaves the state in place;
+                    // only a submit that took closes the dialog.
+                    if this.rename_dialog.is_none() {
+                        window.close_dialog(cx);
+                    }
                 }
             },
         )
         .detach();
-        self.rename_dialog = Some(state);
+        // Kept here so the dialog builder can read the typed name back out.
+        self.rename_dialog = Some(state.clone());
+        let view = cx.entity();
+        window.open_dialog(cx, move |dialog, _window, _cx| {
+            let input = state.clone();
+            let on_ok = view.clone();
+            let on_close = view.clone();
+            dialog
+                .title("Rename Profile")
+                .w(px(420.0))
+                .child(Input::new(&input))
+                .footer(
+                    DialogFooter::new()
+                        .child(
+                            DialogClose::new().child(Button::new("rename-cancel").label("Cancel")),
+                        )
+                        .child(
+                            DialogAction::new()
+                                .child(Button::new("rename-confirm").primary().label("Save")),
+                        ),
+                )
+                .on_ok(move |_, _window, cx| {
+                    on_ok.update(cx, |this, cx| {
+                        if let Some(input) = this.rename_dialog.clone() {
+                            let name = input.read(cx).value().to_string();
+                            this.submit_rename(name, cx);
+                        }
+                        // Stays open while the name is still empty.
+                        this.rename_dialog.is_none()
+                    })
+                })
+                .on_close(move |_, _window, cx| {
+                    on_close.update(cx, |this, cx| {
+                        this.rename_dialog = None;
+                        cx.notify();
+                    });
+                })
+        });
         cx.notify();
     }
 
@@ -647,14 +752,12 @@ impl Render for LibraryDetailView {
                 .child(Skeleton::new().w_1_2().h_4().rounded_md())
                 .child(Skeleton::new().w_full().h(px(120.0)).rounded_lg())
                 .into_any_element(),
-            LoadState::NotFound => div()
-                .text_color(theme.danger)
-                .child("Profile not found")
-                .into_any_element(),
-            LoadState::Failed(e) => div()
-                .text_color(theme.danger)
-                .child(format!("Failed: {e}"))
-                .into_any_element(),
+            LoadState::NotFound => {
+                Alert::error("profile-not-found", "Profile not found").into_any_element()
+            }
+            LoadState::Failed(e) => {
+                Alert::error("profile-load-failed", format!("Failed: {e}")).into_any_element()
+            }
             LoadState::Loaded(profile) => {
                 // Each section is built by a helper so its (large) element
                 // temporaries live in that helper's stack frame, not all in
@@ -703,35 +806,6 @@ impl Render for LibraryDetailView {
                     .child(Progress::new("export-progress").value(p as f32))
             }))
             .child(body)
-            .children(self.rename_dialog.clone().map(|input| {
-                dialog_overlay(
-                    input,
-                    "Rename Profile",
-                    "Save",
-                    theme.clone(),
-                    cx.listener(|this, _: &ClickEvent, _, cx| {
-                        if let Some(input) = this.rename_dialog.clone() {
-                            let name = input.read(cx).value().to_string();
-                            this.submit_rename(name, cx);
-                        }
-                    }),
-                    cx.listener(|this, _: &ClickEvent, _, cx| {
-                        this.rename_dialog = None;
-                        cx.notify();
-                    }),
-                )
-            }))
-            .children(
-                self.icon_dialog
-                    .as_ref()
-                    .and_then(|s| match &self.state {
-                        LoadState::Loaded(profile) => Some((s, profile.clone())),
-                        _ => None,
-                    })
-                    .map(|(state, profile)| {
-                        render_icon_dialog(state, &profile, &self.mod_names, theme.clone(), cx)
-                    }),
-            )
     }
 }
 
@@ -840,8 +914,8 @@ impl LibraryDetailView {
                     .small()
                     .icon(Icon::new(IconName::Palette))
                     .label("Edit Icon")
-                    .on_click(cx.listener(|this, _, _window, cx| {
-                        this.open_icon_dialog(cx);
+                    .on_click(cx.listener(|this, _, window, cx| {
+                        this.open_icon_dialog(window, cx);
                     })),
             )
             .child(
@@ -895,15 +969,23 @@ impl LibraryDetailView {
         let primary_controls = self.render_primary_controls(bep_installed, installing, theme, cx);
         let manage_buttons = self.render_manage_buttons(cx);
 
-        let launch_err = self
-            .launch_error
-            .clone()
-            .map(|msg| div().text_sm().text_color(theme.danger).child(msg));
+        let launch_err = self.launch_error.clone().map(|msg| {
+            Alert::error("profile-launch-error", msg)
+                .small()
+                .on_close(cx.listener(|this, _, _window, cx| {
+                    this.launch_error = None;
+                    cx.notify();
+                }))
+        });
 
-        let notice = self
-            .notice
-            .clone()
-            .map(|msg| div().text_sm().text_color(theme.success).child(msg));
+        let notice = self.notice.clone().map(|msg| {
+            Alert::success("profile-notice", msg)
+                .small()
+                .on_close(cx.listener(|this, _, _window, cx| {
+                    this.notice = None;
+                    cx.notify();
+                }))
+        });
 
         let progress_row = self.bep_progress.as_ref().map(|p| {
             div()
@@ -977,7 +1059,7 @@ impl LibraryDetailView {
                     .items_center()
                     .gap_4()
                     .flex_wrap()
-                    .child(profile_icon(profile, 80.0, theme))
+                    .child(profile_icon(profile, 80.0))
                     .child(title_col)
                     .children(primary_controls.map(|c| div().flex_none().child(c))),
             )
@@ -1010,6 +1092,7 @@ impl LibraryDetailView {
                 .enumerate()
                 .map(|(ix, m)| {
                     let display = mod_display_name(m, &mod_names);
+                    let display_for_confirm = display.clone();
                     let is_last = ix + 1 == profile.mods.len();
                     let name_color = if m.enabled {
                         theme.text
@@ -1019,34 +1102,15 @@ impl LibraryDetailView {
                     let mod_id = m.mod_id.clone();
                     let enabled = m.enabled;
                     let has_file = m.file.is_some();
-                    let confirming_mod_delete = self
-                        .confirming_delete_mod
-                        .as_deref()
-                        .is_some_and(|id| id == m.mod_id);
-                    // Custom mods have no catalog entry, so no thumbnail to fetch.
-                    let thumbnail: AnyElement = if m.is_custom() {
-                        div()
-                            .w(px(32.0))
-                            .h(px(32.0))
-                            .flex_none()
-                            .rounded_md()
-                            .bg(theme.hover)
-                            .flex()
-                            .items_center()
-                            .justify_center()
-                            .text_color(theme.text_muted)
-                            .child(Icon::new(IconName::File))
-                            .into_any_element()
-                    } else {
-                        img(api::mod_thumbnail_url(&m.mod_id))
-                            .w(px(32.0))
-                            .h(px(32.0))
-                            .flex_none()
-                            .rounded_md()
-                            .object_fit(ObjectFit::Cover)
-                            .bg(theme.hover)
-                            .into_any_element()
-                    };
+                    // Custom mods have no catalog entry, so no thumbnail to
+                    // fetch — they fall back to the placeholder icon.
+                    let thumbnail = Avatar::new()
+                        .with_size(px(32.0))
+                        .rounded_md()
+                        .placeholder(Icon::new(IconName::File))
+                        .when(!m.is_custom(), |this| {
+                            this.src(api::mod_thumbnail_url(&m.mod_id))
+                        });
                     let version_label = if m.is_custom() {
                         "Custom".to_string()
                     } else {
@@ -1084,43 +1148,19 @@ impl LibraryDetailView {
                                     this.toggle_mod(mod_id.clone(), *checked, cx)
                                 }))
                         }))
-                        .child(if confirming_mod_delete {
-                            let confirm_id = mod_id.clone();
-                            div()
-                                .flex()
-                                .items_center()
-                                .gap_1()
-                                .child(
-                                    Button::new(SharedString::from(format!(
-                                        "mod-delete-confirm-{ix}"
-                                    )))
-                                    .danger()
-                                    .label("Remove")
-                                    .on_click(cx.listener(move |this, _, _window, cx| {
-                                        this.delete_mod(confirm_id.clone(), cx)
-                                    })),
-                                )
-                                .child(
-                                    Button::new(SharedString::from(format!(
-                                        "mod-delete-cancel-{ix}"
-                                    )))
-                                    .label("Cancel")
-                                    .on_click(cx.listener(|this, _, _window, cx| {
-                                        this.confirming_delete_mod = None;
-                                        cx.notify();
-                                    })),
-                                )
-                                .into_any_element()
-                        } else {
+                        .child(
                             Button::new(SharedString::from(format!("mod-delete-{ix}")))
                                 .ghost()
                                 .icon(Icon::new(IconName::Delete))
-                                .on_click(cx.listener(move |this, _, _window, cx| {
-                                    this.confirming_delete_mod = Some(mod_id.clone());
-                                    cx.notify();
-                                }))
-                                .into_any_element()
-                        })
+                                .on_click(cx.listener(move |this, _, window, cx| {
+                                    this.confirm_delete_mod(
+                                        mod_id.clone(),
+                                        display_for_confirm.clone(),
+                                        window,
+                                        cx,
+                                    )
+                                })),
+                        )
                         .into_any_element()
                 })
                 .collect();
@@ -1188,39 +1228,14 @@ impl LibraryDetailView {
         theme: &crate::theme::Theme,
         cx: &mut Context<Self>,
     ) -> AnyElement {
-        let delete_controls: AnyElement = if self.confirming_delete {
-            div()
-                .flex()
-                .gap_2()
-                .items_center()
-                .child(
-                    Button::new("confirm-delete")
-                        .danger()
-                        .icon(Icon::new(IconName::Delete))
-                        .label("Delete")
-                        .on_click(cx.listener(|this, _, _window, cx| this.delete_profile(cx))),
-                )
-                .child(
-                    Button::new("cancel-delete")
-                        .label("Cancel")
-                        .on_click(cx.listener(|this, _, _window, cx| {
-                            this.confirming_delete = false;
-                            cx.notify();
-                        })),
-                )
-                .into_any_element()
-        } else {
-            Button::new("delete-profile")
-                .danger()
-                .outline()
-                .icon(Icon::new(IconName::Delete))
-                .label("Delete Profile")
-                .on_click(cx.listener(|this, _, _window, cx| {
-                    this.confirming_delete = true;
-                    cx.notify();
-                }))
-                .into_any_element()
-        };
+        let delete_controls = Button::new("delete-profile")
+            .danger()
+            .outline()
+            .icon(Icon::new(IconName::Delete))
+            .label("Delete Profile")
+            .on_click(cx.listener(|this, _, window, cx| {
+                this.confirm_delete_profile(window, cx);
+            }));
 
         div()
             .flex()
@@ -1279,41 +1294,4 @@ fn mod_display_name(m: &ProfileModEntry, names: &HashMap<String, String>) -> Str
         return file.to_string();
     }
     m.mod_id.clone()
-}
-
-fn dialog_overlay(
-    input: Entity<InputState>,
-    title: &'static str,
-    confirm: &'static str,
-    theme: crate::theme::Theme,
-    on_confirm: impl Fn(&ClickEvent, &mut Window, &mut App) + 'static,
-    on_cancel: impl Fn(&ClickEvent, &mut Window, &mut App) + 'static,
-) -> impl IntoElement {
-    crate::views::modal_overlay(
-        &theme,
-        px(420.0),
-        [
-            div()
-                .font_weight(FontWeight::SEMIBOLD)
-                .child(title)
-                .into_any_element(),
-            Input::new(&input).into_any_element(),
-            div()
-                .flex()
-                .gap_2()
-                .justify_end()
-                .child(
-                    Button::new("dialog-cancel")
-                        .label("Cancel")
-                        .on_click(on_cancel),
-                )
-                .child(
-                    Button::new("dialog-confirm")
-                        .primary()
-                        .label(confirm)
-                        .on_click(on_confirm),
-                )
-                .into_any_element(),
-        ],
-    )
 }

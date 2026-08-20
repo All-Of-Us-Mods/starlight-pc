@@ -3,6 +3,7 @@ use gpui::*;
 use crate::backend::api::{self, ModResponse, Post};
 use crate::theme::ThemeExt;
 use crate::ui::mod_card;
+use gpui_component::alert::Alert;
 use gpui_component::button::Button;
 use gpui_component::skeleton::Skeleton;
 
@@ -72,19 +73,14 @@ impl HomeView {
 
 /// Error text plus a Retry button, shared by both sections (retrying reloads
 /// the whole page — news and trending come from the same fetch pass).
-fn failed_row(
-    id: &'static str,
-    message: &str,
-    theme: &crate::theme::Theme,
-    cx: &mut Context<HomeView>,
-) -> AnyElement {
+fn failed_row(id: &'static str, message: &str, cx: &mut Context<HomeView>) -> AnyElement {
     div()
         .flex()
         .items_center()
         .gap_3()
-        .child(div().text_color(theme.danger).child(message.to_string()))
+        .child(Alert::error(id, message.to_string()).flex_1())
         .child(
-            Button::new(id)
+            Button::new(SharedString::from(format!("{id}-button")))
                 .label("Retry")
                 .on_click(cx.listener(|this, _, _window, cx| this.fetch(cx))),
         )
@@ -194,7 +190,7 @@ impl Render for HomeView {
                 .pb_2()
                 .children((0..4).map(|_| news_card_skeleton(&theme).into_any_element()))
                 .into_any_element(),
-            Loading::Failed(e) => failed_row("news-retry", &e.clone(), &theme, cx),
+            Loading::Failed(e) => failed_row("news-retry", &e.clone(), cx),
             Loading::Ready(items) => carousel(
                 "news-carousel",
                 items.iter().map(|p| news_card(p, &theme, cx)).collect(),
@@ -211,7 +207,7 @@ impl Render for HomeView {
                     mod_card::mod_card_skeleton(Some(px(CARD_WIDTH)), &theme).into_any_element()
                 }))
                 .into_any_element(),
-            Loading::Failed(e) => failed_row("trending-retry", &e.clone(), &theme, cx),
+            Loading::Failed(e) => failed_row("trending-retry", &e.clone(), cx),
             Loading::Ready(items) => carousel(
                 "trending-carousel",
                 items

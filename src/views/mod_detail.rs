@@ -1,11 +1,13 @@
 use gpui::*;
 use gpui_component::{
-    Disableable as _, Icon, IconName, WindowExt,
-    button::{Button, ButtonVariants},
+    Disableable as _, Icon, IconName, Sizable as _, WindowExt,
+    alert::Alert,
+    button::{Button, ButtonVariants, Toggle, ToggleVariants as _},
     checkbox::Checkbox,
     input::{Input, InputState},
     notification::Notification,
     progress::Progress,
+    separator::Separator,
     skeleton::Skeleton,
     tag::Tag,
     text::TextView,
@@ -601,10 +603,9 @@ impl Render for ModDetailView {
                         .child(Skeleton::new().w_3_4().h_3().rounded_md()),
                 )
                 .into_any_element(),
-            LoadState::Failed(e) => div()
-                .text_color(theme.danger)
-                .child(format!("Failed: {e}"))
-                .into_any_element(),
+            LoadState::Failed(e) => {
+                Alert::error("mod-load-failed", format!("Failed: {e}")).into_any_element()
+            }
             LoadState::Loaded(data) => {
                 let m = &data.mod_info;
                 let latest_version_label = data
@@ -692,7 +693,7 @@ impl Render for ModDetailView {
                             .text_color(theme.text_muted)
                             .child(m.description.clone()),
                     )
-                    .child(div().h(px(1.0)).w_full().bg(theme.border))
+                    .child(Separator::horizontal())
                     .children(m.long_description.clone().map(|description| {
                         div()
                             .flex()
@@ -791,10 +792,8 @@ fn render_install_panel(
                 .into_any_element(),
         ),
         InstallStatus::Done => Some(
-            div()
-                .text_xs()
-                .text_color(theme.success)
-                .child("Installed.")
+            Alert::success("install-done", "Installed.")
+                .small()
                 .into_any_element(),
         ),
         InstallStatus::Failed(e) => Some(
@@ -803,10 +802,9 @@ fn render_install_panel(
                 .items_center()
                 .gap_2()
                 .child(
-                    div()
-                        .text_xs()
-                        .text_color(theme.danger)
-                        .child(format!("Failed: {e}")),
+                    Alert::error("install-failed", format!("Failed: {e}"))
+                        .small()
+                        .flex_1(),
                 )
                 .child(
                     // Re-resolve from scratch — a failed install can leave the
@@ -828,57 +826,23 @@ fn render_install_panel(
     let profile_rows = profiles.iter().enumerate().map(|(ix, p)| {
         let selected = panel.selected_profile_id.as_deref() == Some(p.id.as_str());
         let id = p.id.clone();
-        div()
-            .id(SharedString::from(format!("install-profile-{ix}")))
-            .px_3()
-            .py_2()
-            .rounded_md()
-            .border_1()
-            .border_color(if selected {
-                theme.primary
-            } else {
-                theme.border
-            })
-            .bg(if selected {
-                theme.hover
-            } else {
-                theme.background
-            })
-            .cursor_pointer()
-            .child(p.name.clone())
-            .on_mouse_down(
-                MouseButton::Left,
-                cx.listener(move |this, _, _window, cx| {
-                    this.select_profile(id.clone(), cx);
-                }),
-            )
+        Toggle::new(SharedString::from(format!("install-profile-{ix}")))
+            .outline()
+            .label(p.name.clone())
+            .checked(selected)
+            .on_click(cx.listener(move |this, _: &bool, _window, cx| {
+                this.select_profile(id.clone(), cx);
+            }))
             .into_any_element()
     });
     let new_selected = panel.selected_profile_id.is_none();
-    let new_profile_chip = div()
-        .id("install-profile-new")
-        .px_3()
-        .py_2()
-        .rounded_md()
-        .border_1()
-        .border_color(if new_selected {
-            theme.primary
-        } else {
-            theme.border
-        })
-        .bg(if new_selected {
-            theme.hover
-        } else {
-            theme.background
-        })
-        .cursor_pointer()
-        .child("+ New profile")
-        .on_mouse_down(
-            MouseButton::Left,
-            cx.listener(|this, _, window, cx| {
-                this.select_new_profile(window, cx);
-            }),
-        )
+    let new_profile_chip = Toggle::new("install-profile-new")
+        .outline()
+        .label("+ New profile")
+        .checked(new_selected)
+        .on_click(cx.listener(|this, _: &bool, window, cx| {
+            this.select_new_profile(window, cx);
+        }))
         .into_any_element();
     // New profile first — it's the default.
     let profile_chips: Vec<AnyElement> = std::iter::once(new_profile_chip)
@@ -888,31 +852,14 @@ fn render_install_panel(
     let version_rows = versions.iter().enumerate().map(|(ix, v)| {
         let selected = panel.selected_version == v.version;
         let version = v.version.clone();
-        div()
-            .id(SharedString::from(format!("install-version-{ix}")))
-            .px_3()
-            .py_1()
-            .rounded_md()
-            .border_1()
-            .border_color(if selected {
-                theme.primary
-            } else {
-                theme.border
-            })
-            .bg(if selected {
-                theme.hover
-            } else {
-                theme.background
-            })
-            .cursor_pointer()
-            .text_xs()
-            .child(format!("v{}", v.version))
-            .on_mouse_down(
-                MouseButton::Left,
-                cx.listener(move |this, _, _window, cx| {
-                    this.select_version(version.clone(), cx);
-                }),
-            )
+        Toggle::new(SharedString::from(format!("install-version-{ix}")))
+            .outline()
+            .small()
+            .label(format!("v{}", v.version))
+            .checked(selected)
+            .on_click(cx.listener(move |this, _: &bool, _window, cx| {
+                this.select_version(version.clone(), cx);
+            }))
     });
 
     // The profile is created when Install runs, so this is just its name.

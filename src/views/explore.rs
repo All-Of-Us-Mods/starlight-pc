@@ -4,6 +4,7 @@ use crate::backend::api::{self, ModResponse};
 use crate::theme::ThemeExt;
 use crate::ui::mod_card::{self, MOD_CARD_HEIGHT};
 use gpui_component::Selectable;
+use gpui_component::alert::Alert;
 use gpui_component::button::{Button, ButtonVariants};
 use gpui_component::input::{Input, InputEvent, InputState};
 use gpui_component::pagination::Pagination;
@@ -281,11 +282,10 @@ impl Render for ExploreView {
                 .items_center()
                 .justify_center()
                 .gap_3()
-                .child(
-                    div()
-                        .text_color(theme.danger)
-                        .child(format!("Failed to load mods: {e}")),
-                )
+                .child(Alert::error(
+                    "explore-load-failed",
+                    format!("Failed to load mods: {e}"),
+                ))
                 .child(
                     Button::new("explore-retry")
                         .label("Retry")

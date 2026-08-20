@@ -177,6 +177,14 @@ impl<'a, V> ThemeExt for Context<'a, V> {
     }
 }
 
+// Dialog and sheet builders run with a bare `App` (they're re-invoked by the
+// window's dialog layer, not from a view's render), so they need this too.
+impl ThemeExt for App {
+    fn theme(&self) -> &Theme {
+        self.global::<Theme>()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     // Deliberately not `use super::*`: that pulls in `gpui::*`, whose `test`

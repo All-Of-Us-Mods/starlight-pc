@@ -7,11 +7,14 @@ use crate::backend::error::AppResult;
 use crate::backend::services::region_service::{self, RegionInfo};
 use crate::theme::ThemeExt;
 use crate::views::{page_root, section_label};
+use gpui_component::alert::Alert;
 use gpui_component::button::{Button, ButtonVariants};
 use gpui_component::checkbox::Checkbox;
+use gpui_component::dialog::{DialogAction, DialogClose, DialogFooter};
+use gpui_component::form::{field, v_form};
 use gpui_component::input::{Input, InputState};
 use gpui_component::skeleton::Skeleton;
-use gpui_component::{Icon, IconName, Sizable};
+use gpui_component::{Icon, IconName, Sizable, WindowExt};
 
 pub struct ServersView {
     state: LoadState,
@@ -131,7 +134,12 @@ impl ServersView {
 
     /// Add the server described by a `starlight://servers/add` link. Same path
     /// as the "Add custom server" dialog, minus the dialog.
-    pub fn add_from_deep_link(&mut self, link: ServerLink, cx: &mut Context<Self>) {
+    pub fn add_from_deep_link(
+        &mut self,
+        link: ServerLink,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
         // `host` and `editable` have nowhere to live: user servers are stored
         // as Among Us regions (`regionInfo.json`), which has no field for
         // either. Logged so a link author can see they arrived.
@@ -145,7 +153,10 @@ impl ServersView {
         );
         self.error = None;
         self.notice = None;
-        self.custom_dialog = None;
+        // A link arriving while the manual dialog is open supersedes it.
+        if self.custom_dialog.take().is_some() {
+            window.close_dialog(cx);
+        }
         cx.notify();
         cx.spawn(async move |this, cx| {
             let result = cx
@@ -211,6 +222,75 @@ impl ServersView {
             dtls: false,
             error: None,
         });
+        let view = cx.entity();
+        window.open_dialog(cx, move |dialog, _window, cx| {
+            let view = view.clone();
+            // The dialog outlives a single render, so its fields are read back
+            // out of the view every frame rather than captured once.
+            let Some(state) = view.read(cx).custom_dialog.as_ref() else {
+                return dialog;
+            };
+            let (name, address, port, dtls, error) = (
+                state.name.clone(),
+                state.address.clone(),
+                state.port.clone(),
+                state.dtls,
+                state.error.clone(),
+            );
+            let on_toggle = view.clone();
+            let on_ok = view.clone();
+            let on_close = view.clone();
+            dialog
+                .title("Add custom server")
+                .w(px(420.0))
+                .child(
+                    v_form()
+                        .child(field().label("Name").child(Input::new(&name)))
+                        .child(field().label("Address").child(Input::new(&address)))
+                        .child(field().label("Port").child(Input::new(&port)))
+                        .child(
+                            field().child(
+                                Checkbox::new("custom-dtls")
+                                    .label("Use DTLS")
+                                    .checked(dtls)
+                                    .on_click(move |checked: &bool, _window, cx| {
+                                        let checked = *checked;
+                                        on_toggle.update(cx, |this, cx| {
+                                            if let Some(d) = this.custom_dialog.as_mut() {
+                                                d.dtls = checked;
+                                            }
+                                            cx.notify();
+                                        });
+                                    }),
+                            ),
+                        ),
+                )
+                .children(error.map(|e| Alert::error("custom-server-error", e)))
+                .footer(
+                    DialogFooter::new()
+                        .child(
+                            DialogClose::new().child(Button::new("custom-cancel").label("Cancel")),
+                        )
+                        .child(
+                            DialogAction::new()
+                                .child(Button::new("custom-add").primary().label("Add")),
+                        ),
+                )
+                // A rejected submit keeps the dialog open with its error shown;
+                // `custom_dialog` is only cleared once the add went through.
+                .on_ok(move |_, _window, cx| {
+                    on_ok.update(cx, |this, cx| {
+                        this.submit_custom(cx);
+                        this.custom_dialog.is_none()
+                    })
+                })
+                .on_close(move |_, _window, cx| {
+                    on_close.update(cx, |this, cx| {
+                        this.custom_dialog = None;
+                        cx.notify();
+                    });
+                })
+        });
         cx.notify();
     }
 
@@ -272,75 +352,6 @@ impl ServersView {
             });
         })
         .detach();
-    }
-
-    fn render_custom_dialog(
-        &self,
-        theme: &crate::theme::Theme,
-        cx: &mut Context<Self>,
-    ) -> Option<AnyElement> {
-        let dialog = self.custom_dialog.as_ref()?;
-        let field = |label: &'static str, input: &Entity<InputState>| {
-            div()
-                .flex()
-                .flex_col()
-                .gap_1()
-                .child(div().text_xs().text_color(theme.text_muted).child(label))
-                .child(Input::new(input))
-                .into_any_element()
-        };
-
-        let mut items: Vec<AnyElement> = vec![
-            div()
-                .font_weight(FontWeight::SEMIBOLD)
-                .child("Add custom server")
-                .into_any_element(),
-            field("Name", &dialog.name),
-            field("Address", &dialog.address),
-            field("Port", &dialog.port),
-            Checkbox::new("custom-dtls")
-                .label("Use DTLS")
-                .checked(dialog.dtls)
-                .on_click(cx.listener(|this, checked: &bool, _window, cx| {
-                    if let Some(d) = this.custom_dialog.as_mut() {
-                        d.dtls = *checked;
-                    }
-                    cx.notify();
-                }))
-                .into_any_element(),
-        ];
-        if let Some(err) = &dialog.error {
-            items.push(
-                div()
-                    .text_xs()
-                    .text_color(theme.danger)
-                    .child(err.clone())
-                    .into_any_element(),
-            );
-        }
-        items.push(
-            div()
-                .flex()
-                .gap_2()
-                .justify_end()
-                .child(
-                    Button::new("custom-cancel")
-                        .label("Cancel")
-                        .on_click(cx.listener(|this, _, _window, cx| {
-                            this.custom_dialog = None;
-                            cx.notify();
-                        })),
-                )
-                .child(
-                    Button::new("custom-add")
-                        .primary()
-                        .label("Add")
-                        .on_click(cx.listener(|this, _, _window, cx| this.submit_custom(cx))),
-                )
-                .into_any_element(),
-        );
-
-        Some(crate::views::modal_overlay(theme, px(420.0), items).into_any_element())
     }
 
     fn is_installed(&self, server: &Server) -> bool {
@@ -433,9 +444,11 @@ impl ServersView {
                 .items_center()
                 .gap_3()
                 .child(
-                    div()
-                        .text_color(theme.danger)
-                        .child(format!("Failed to load servers: {e}")),
+                    Alert::error(
+                        "servers-load-failed",
+                        format!("Failed to load servers: {e}"),
+                    )
+                    .flex_1(),
                 )
                 .child(
                     Button::new("servers-retry")
@@ -542,18 +555,21 @@ impl Render for ServersView {
                     ),
             )
             .children(self.error.clone().map(|message| {
-                div()
-                    .rounded_md()
-                    .bg(rgb(0x7f1d1d))
-                    .p_3()
-                    .text_color(theme.text)
-                    .child(message)
+                Alert::error("servers-error", message).on_close(cx.listener(
+                    |this, _, _window, cx| {
+                        this.error = None;
+                        cx.notify();
+                    },
+                ))
             }))
-            .children(
-                self.notice
-                    .clone()
-                    .map(|message| div().text_sm().text_color(theme.success).child(message)),
-            )
+            .children(self.notice.clone().map(|message| {
+                Alert::success("servers-notice", message).on_close(cx.listener(
+                    |this, _, _window, cx| {
+                        this.notice = None;
+                        cx.notify();
+                    },
+                ))
+            }))
             .child(
                 div()
                     .flex()
@@ -586,6 +602,5 @@ impl Render for ServersView {
                     .child(section_label("Available servers", &theme))
                     .child(self.render_available(&theme, cx)),
             )
-            .children(self.render_custom_dialog(&theme, cx))
     }
 }

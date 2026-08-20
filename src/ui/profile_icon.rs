@@ -1,58 +1,38 @@
+use gpui::prelude::FluentBuilder as _;
 use gpui::*;
 use std::path::PathBuf;
 
 use crate::backend::api;
 use crate::backend::services::profile_service::ProfileEntry;
-use crate::theme::Theme;
-use gpui_component::{Icon, IconName};
+use gpui_component::avatar::Avatar;
+use gpui_component::{Icon, IconName, Sizable as _};
 
-pub fn profile_icon(profile: &ProfileEntry, size: f32, theme: &Theme) -> AnyElement {
-    let size_px = px(size);
-    let common = |el: Div| {
-        el.w(size_px)
-            .h(size_px)
-            .flex_none()
-            .rounded_md()
-            .overflow_hidden()
-            .bg(theme.hover)
+/// The profile's icon at `size` px: its custom image, the thumbnail of the mod
+/// it borrows its icon from, or the default placeholder. Square rather than
+/// round, and the placeholder also covers an image that fails to load.
+pub fn profile_icon(profile: &ProfileEntry, size: f32) -> AnyElement {
+    let source: Option<ImageSource> = match profile.icon_mode.as_deref() {
+        Some("custom") => profile
+            .custom_icon_extension
+            .as_deref()
+            .filter(|s| !s.is_empty())
+            .map(|ext| {
+                PathBuf::from(&profile.path)
+                    .join(format!("icon{ext}"))
+                    .into()
+            }),
+        Some("mod") => profile
+            .icon_mod_id
+            .as_deref()
+            .filter(|s| !s.is_empty())
+            .map(|mod_id| api::mod_thumbnail_url(mod_id).into()),
+        _ => None,
     };
 
-    match profile.icon_mode.as_deref() {
-        Some("custom") => {
-            if let Some(ext) = profile
-                .custom_icon_extension
-                .as_deref()
-                .filter(|s| !s.is_empty())
-            {
-                let path = PathBuf::from(&profile.path).join(format!("icon{ext}"));
-                return common(div())
-                    .child(img(path).w(size_px).h(size_px).object_fit(ObjectFit::Cover))
-                    .into_any_element();
-            }
-        }
-        Some("mod") => {
-            if let Some(mod_id) = profile.icon_mod_id.as_deref().filter(|s| !s.is_empty()) {
-                return common(div())
-                    .child(
-                        img(api::mod_thumbnail_url(mod_id))
-                            .w(size_px)
-                            .h(size_px)
-                            .object_fit(ObjectFit::Cover),
-                    )
-                    .into_any_element();
-            }
-        }
-        _ => {}
-    }
-
-    common(div())
-        .flex()
-        .items_center()
-        .justify_center()
-        .child(
-            Icon::new(IconName::Inbox)
-                .size(px(size * 0.55))
-                .text_color(theme.text_muted),
-        )
+    Avatar::new()
+        .with_size(px(size))
+        .rounded_md()
+        .placeholder(Icon::new(IconName::Inbox))
+        .when_some(source, |this, source| this.src(source))
         .into_any_element()
 }
