@@ -17,6 +17,7 @@ pub enum AppIcon {
     Compass,
     Library,
     Download,
+    Pencil,
     Starlight,
 }
 
@@ -27,6 +28,7 @@ impl IconNamed for AppIcon {
             AppIcon::Compass => "icons/compass.svg",
             AppIcon::Library => "icons/library.svg",
             AppIcon::Download => "icons/download.svg",
+            AppIcon::Pencil => "icons/pencil.svg",
             AppIcon::Starlight => "icons/starlight.svg",
         }
         .into()
@@ -43,6 +45,7 @@ impl AssetSource for EmbeddedAssets {
             "icons/compass.svg" => Some(include_bytes!("../../assets/icons/compass.svg")),
             "icons/library.svg" => Some(include_bytes!("../../assets/icons/library.svg")),
             "icons/download.svg" => Some(include_bytes!("../../assets/icons/download.svg")),
+            "icons/pencil.svg" => Some(include_bytes!("../../assets/icons/pencil.svg")),
             "icons/starlight.svg" => Some(include_bytes!("../../assets/icons/starlight.svg")),
             _ => None,
         };

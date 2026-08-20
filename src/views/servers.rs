@@ -6,13 +6,14 @@ use crate::backend::deeplink::ServerLink;
 use crate::backend::error::AppResult;
 use crate::backend::services::region_service::{self, RegionInfo};
 use crate::theme::ThemeExt;
+use crate::ui::icon::AppIcon;
 use crate::views::{page_root, section_label};
 use gpui_component::alert::Alert;
 use gpui_component::button::{Button, ButtonVariants};
 use gpui_component::checkbox::Checkbox;
 use gpui_component::dialog::{DialogAction, DialogClose, DialogFooter};
 use gpui_component::form::{field, v_form};
-use gpui_component::input::{Input, InputState};
+use gpui_component::input::{Input, InputEvent, InputState};
 use gpui_component::skeleton::Skeleton;
 use gpui_component::{Icon, IconName, Sizable, WindowExt};
 
@@ -30,13 +31,15 @@ pub struct ServersView {
     error: Option<String>,
 }
 
-/// Inputs for the "add custom server" modal.
+/// Inputs for the add / edit server modal.
 struct CustomServerInput {
     name: Entity<InputState>,
     address: Entity<InputState>,
     port: Entity<InputState>,
     dtls: bool,
     error: Option<String>,
+    /// Index of the region being edited, or `None` when adding a new one.
+    editing: Option<usize>,
 }
 
 enum LoadState {
@@ -153,7 +156,7 @@ impl ServersView {
         );
         self.error = None;
         self.notice = None;
-        // A link arriving while the manual dialog is open supersedes it.
+        // A link arriving mid-add/edit wins: drop the half-filled dialog.
         if self.custom_dialog.take().is_some() {
             window.close_dialog(cx);
         }
@@ -211,37 +214,91 @@ impl ServersView {
     }
 
     fn open_custom_dialog(&mut self, window: &mut Window, cx: &mut Context<Self>) {
-        let name = cx.new(|cx| InputState::new(window, cx).placeholder("My Server"));
-        let address = cx.new(|cx| InputState::new(window, cx).placeholder("au-eu.example.com"));
-        let port = cx.new(|cx| InputState::new(window, cx).default_value("443"));
+        self.open_dialog(None, region_service::RegionFields::default(), window, cx);
+    }
+
+    /// Open the same dialog pre-filled with an installed region's current
+    /// values; saving replaces that region in place.
+    fn open_edit_dialog(&mut self, index: usize, window: &mut Window, cx: &mut Context<Self>) {
+        let Some(region) = self
+            .regions
+            .as_ref()
+            .and_then(|info| info.regions.get(index))
+        else {
+            return;
+        };
+        let fields = region_service::region_fields(region);
+        self.open_dialog(Some(index), fields, window, cx);
+    }
+
+    fn open_dialog(
+        &mut self,
+        editing: Option<usize>,
+        fields: region_service::RegionFields,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
+        let name = cx.new(|cx| {
+            InputState::new(window, cx)
+                .placeholder("My Server")
+                .default_value(fields.name)
+        });
+        let address = cx.new(|cx| {
+            InputState::new(window, cx)
+                .placeholder("au-eu.example.com")
+                .default_value(fields.address)
+        });
+        let port = cx.new(|cx| InputState::new(window, cx).default_value(fields.port.to_string()));
         name.read(cx).focus_handle(cx).focus(window, cx);
+        // Enter submits from any of the three fields, like the profile dialogs.
+        // The subscriptions die with these inputs when the dialog is replaced.
+        for input in [&name, &address, &port] {
+            cx.subscribe_in(input, window, |this, _, event: &InputEvent, window, cx| {
+                if let InputEvent::PressEnter { .. } = event {
+                    this.submit_custom(cx);
+                    // A rejected submit keeps its error on screen.
+                    if this.custom_dialog.is_none() {
+                        window.close_dialog(cx);
+                    }
+                }
+            })
+            .detach();
+        }
         self.custom_dialog = Some(CustomServerInput {
             name,
             address,
             port,
-            dtls: false,
+            dtls: fields.dtls,
             error: None,
+            editing,
         });
+
+        // The dialog lives in the window's dialog layer, above the page and its
+        // scroll container. It outlives a single render, so its fields are read
+        // back out of the view every frame rather than captured once.
         let view = cx.entity();
         window.open_dialog(cx, move |dialog, _window, cx| {
             let view = view.clone();
-            // The dialog outlives a single render, so its fields are read back
-            // out of the view every frame rather than captured once.
             let Some(state) = view.read(cx).custom_dialog.as_ref() else {
                 return dialog;
             };
-            let (name, address, port, dtls, error) = (
+            let (name, address, port, dtls, error, editing) = (
                 state.name.clone(),
                 state.address.clone(),
                 state.port.clone(),
                 state.dtls,
                 state.error.clone(),
+                state.editing.is_some(),
             );
             let on_toggle = view.clone();
             let on_ok = view.clone();
             let on_close = view.clone();
             dialog
-                .title("Add custom server")
+                .title(if editing {
+                    "Edit server"
+                } else {
+                    "Add custom server"
+                })
                 .w(px(420.0))
                 .child(
                     v_form()
@@ -271,13 +328,16 @@ impl ServersView {
                         .child(
                             DialogClose::new().child(Button::new("custom-cancel").label("Cancel")),
                         )
-                        .child(
-                            DialogAction::new()
-                                .child(Button::new("custom-add").primary().label("Add")),
-                        ),
+                        .child(DialogAction::new().child(
+                            Button::new("custom-save").primary().label(if editing {
+                                "Save"
+                            } else {
+                                "Add"
+                            }),
+                        )),
                 )
                 // A rejected submit keeps the dialog open with its error shown;
-                // `custom_dialog` is only cleared once the add went through.
+                // `custom_dialog` is only cleared once the save went through.
                 .on_ok(move |_, _window, cx| {
                     on_ok.update(cx, |this, cx| {
                         this.submit_custom(cx);
@@ -302,6 +362,7 @@ impl ServersView {
         let address = dialog.address.read(cx).value().trim().to_string();
         let port_text = dialog.port.read(cx).value().trim().to_string();
         let dtls = dialog.dtls;
+        let editing = dialog.editing;
 
         if name.is_empty() || address.is_empty() {
             if let Some(d) = self.custom_dialog.as_mut() {
@@ -317,11 +378,33 @@ impl ServersView {
             cx.notify();
             return;
         };
+        // The same rule `update_region` enforces on save, checked here against
+        // the loaded region list so a duplicate is caught while the dialog is
+        // still open (and the typed address still on screen).
+        let clash = self.regions.as_ref().and_then(|info| {
+            region_service::conflicting_region_name(info, editing, &address, port)
+        });
+        if let Some(other) = clash {
+            if let Some(d) = self.custom_dialog.as_mut() {
+                d.error = Some(format!(
+                    "\"{other}\" already points at that address and port."
+                ));
+            }
+            cx.notify();
+            return;
+        }
 
+        // Clearing this is what tells the dialog it may close (see `on_ok`).
         self.custom_dialog = None;
         self.notice = None;
         self.error = None;
         cx.notify();
+
+        if let Some(index) = editing {
+            self.save_region_edit(index, name, address, port, dtls, cx);
+            return;
+        }
+
         cx.spawn(async move |this, cx| {
             let result = cx
                 .background_executor()
@@ -344,6 +427,46 @@ impl ServersView {
                     }
                     Err(e) => {
                         warn!("add custom region failed: {e}");
+                        this.error = Some(e.to_string());
+                    }
+                }
+                this.reload_regions(cx);
+                cx.notify();
+            });
+        })
+        .detach();
+    }
+
+    /// Write an edited region back in place. The index comes from the row the
+    /// user opened, so a region file changed underneath us (another edit, an
+    /// in-game change) is caught by `update_region`'s bounds check.
+    fn save_region_edit(
+        &mut self,
+        index: usize,
+        name: String,
+        address: String,
+        port: u16,
+        dtls: bool,
+        cx: &mut Context<Self>,
+    ) {
+        cx.spawn(async move |this, cx| {
+            let result = cx
+                .background_executor()
+                .spawn(async move {
+                    let fields = region_service::RegionFields {
+                        name: name.clone(),
+                        address,
+                        port,
+                        dtls,
+                    };
+                    region_service::update_region(index, &fields).map(|()| name)
+                })
+                .await;
+            let _ = this.update(cx, |this, cx| {
+                match result {
+                    Ok(name) => this.notice = Some(format!("Saved region \"{name}\"")),
+                    Err(e) => {
+                        warn!("update region failed: {e}");
                         this.error = Some(e.to_string());
                     }
                 }
@@ -384,8 +507,14 @@ impl ServersView {
         }
 
         let rows = info.regions.iter().enumerate().map(|(ix, region)| {
-            let name = region_service::region_name(region).to_string();
-            let remove_name = name.clone();
+            let fields = region_service::region_fields(region);
+            let remove_name = fields.name.clone();
+            let target = format!(
+                "{}:{}{}",
+                fields.address,
+                fields.port,
+                if fields.dtls { " · DTLS" } else { "" }
+            );
             div()
                 .flex()
                 .items_center()
@@ -400,9 +529,32 @@ impl ServersView {
                     div()
                         .flex_1()
                         .min_w_0()
-                        .truncate()
-                        .font_weight(FontWeight::MEDIUM)
-                        .child(name),
+                        .flex()
+                        .flex_col()
+                        .child(
+                            div()
+                                .truncate()
+                                .font_weight(FontWeight::MEDIUM)
+                                .child(fields.name),
+                        )
+                        // The address is what an edit actually changes, so show it.
+                        .child(
+                            div()
+                                .truncate()
+                                .text_xs()
+                                .text_color(theme.text_muted)
+                                .child(target),
+                        ),
+                )
+                .child(
+                    Button::new(SharedString::from(format!("edit-region-{ix}")))
+                        .ghost()
+                        .xsmall()
+                        .icon(Icon::new(AppIcon::Pencil))
+                        .tooltip("Edit this server")
+                        .on_click(cx.listener(move |this, _, window, cx| {
+                            this.open_edit_dialog(ix, window, cx)
+                        })),
                 )
                 .child(
                     Button::new(SharedString::from(format!("remove-region-{ix}")))
@@ -410,6 +562,7 @@ impl ServersView {
                         .xsmall()
                         .danger()
                         .icon(Icon::new(IconName::Delete))
+                        .tooltip("Remove this server")
                         .on_click(cx.listener(move |this, _, _window, cx| {
                             this.remove_region(remove_name.clone(), cx)
                         })),
