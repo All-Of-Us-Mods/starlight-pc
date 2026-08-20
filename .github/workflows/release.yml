@@ -10,7 +10,7 @@ jobs:
     permissions:
       contents: write
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - uses: dtolnay/rust-toolchain@stable
 
@@ -42,7 +42,7 @@ jobs:
           $version = "${{ github.ref_name }}".TrimStart("v")
           & "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe" /DMyAppVersion=$version /O"." packaging\windows\starlight.iss
 
-      - uses: softprops/action-gh-release@v2
+      - uses: softprops/action-gh-release@v3
         with:
           files: |
             Starlight-windows-x86_64.exe
@@ -54,7 +54,7 @@ jobs:
     permissions:
       contents: write
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - uses: dtolnay/rust-toolchain@stable
 
@@ -114,7 +114,7 @@ jobs:
           flatpak-builder --user --force-clean --repo=flatpak-repo flatpak-build packaging/linux/dev.allofus.Starlight.yml
           flatpak build-bundle flatpak-repo Starlight-linux-x86_64.flatpak dev.allofus.Starlight
 
-      - uses: softprops/action-gh-release@v2
+      - uses: softprops/action-gh-release@v3
         with:
           files: |
             Starlight-linux-x86_64
