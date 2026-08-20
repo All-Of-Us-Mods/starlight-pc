@@ -7,7 +7,8 @@
 
 use gpui::*;
 use gpui_component::Sizable as _;
-use gpui_component::button::{Button, ButtonVariants};
+use gpui_component::button::{Toggle, ToggleVariants as _};
+use gpui_component::clipboard::Clipboard;
 use gpui_component::input::{Editor, EditorState, Input, InputEvent, InputState};
 
 use crate::theme::ThemeExt;
@@ -216,17 +217,15 @@ impl Render for LogPanel {
             .iter()
             .copied()
             .map(|level| {
-                let active = self.filters.is_enabled(level);
-                let mut btn = Button::new(level.chip_id()).xsmall().label(level.label());
-                if active {
-                    btn = btn.primary();
-                } else {
-                    btn = btn.ghost();
-                }
-                btn.on_click(cx.listener(move |this, _, _window, cx| {
-                    this.toggle_level(level, cx);
-                }))
-                .into_any_element()
+                Toggle::new(level.chip_id())
+                    .outline()
+                    .xsmall()
+                    .label(level.label())
+                    .checked(self.filters.is_enabled(level))
+                    .on_click(cx.listener(move |this, _: &bool, _window, cx| {
+                        this.toggle_level(level, cx);
+                    }))
+                    .into_any_element()
             })
             .collect();
 
@@ -261,15 +260,9 @@ impl Render for LogPanel {
                     .child(div().w(px(220.0)).child(Input::new(&self.filter_input)))
                     .children(filter_chips)
                     .child(
-                        Button::new("copy-log")
-                            .xsmall()
-                            .ghost()
-                            .label("Copy")
-                            .on_click(move |_, _window, cx| {
-                                cx.write_to_clipboard(ClipboardItem::new_string(
-                                    lines_for_copy.clone(),
-                                ));
-                            }),
+                        Clipboard::new("copy-log")
+                            .value(lines_for_copy)
+                            .tooltip("Copy the filtered log"),
                     ),
             )
             .child(

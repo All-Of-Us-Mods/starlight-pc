@@ -1,5 +1,6 @@
 use chrono::{DateTime, Local};
 use gpui::*;
+use gpui_component::separator::Separator;
 use gpui_component::text::TextView;
 
 use crate::backend::api::Post;
@@ -61,7 +62,7 @@ impl Render for NewsDetailView {
                             .text_color(theme.text_muted)
                             .child(format!("Posted by {}", self.post.author)),
                     )
-                    .child(div().h(px(1.0)).w_full().bg(theme.border))
+                    .child(Separator::horizontal())
                     .child(section_label("Content", &theme))
                     .child(
                         div()

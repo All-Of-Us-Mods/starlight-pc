@@ -13,11 +13,13 @@ use crate::ui::file_drop::{self, DroppedFiles};
 use crate::ui::format;
 use crate::ui::icon::AppIcon;
 use crate::ui::profile_icon::profile_icon;
+use gpui_component::alert::Alert;
 use gpui_component::button::{Button, ButtonVariants};
+use gpui_component::dialog::{DialogAction, DialogClose, DialogFooter};
 use gpui_component::input::{Input, InputEvent, InputState};
 use gpui_component::progress::Progress;
 use gpui_component::skeleton::Skeleton;
-use gpui_component::{Disableable, Icon, IconName};
+use gpui_component::{Disableable, Icon, IconName, WindowExt};
 
 #[derive(Clone, Debug)]
 pub enum LibraryEvent {
@@ -135,14 +137,58 @@ impl LibraryView {
         cx.subscribe_in(
             &state,
             window,
-            |this, state, event: &InputEvent, _window, cx| {
+            |this, state, event: &InputEvent, window, cx| {
                 if let InputEvent::PressEnter { .. } = event {
-                    this.submit_create(state.read(cx).value().to_string(), cx);
+                    let name = state.read(cx).value().to_string();
+                    this.submit_create(name, cx);
+                    // An empty name is rejected and leaves the state in place;
+                    // only a submit that took closes the dialog.
+                    if this.create_dialog.is_none() {
+                        window.close_dialog(cx);
+                    }
                 }
             },
         )
         .detach();
-        self.create_dialog = Some(state);
+        // The input entity is kept here so the dialog builder (which only
+        // holds a handle to this view) can read the typed name back out.
+        self.create_dialog = Some(state.clone());
+        let view = cx.entity();
+        window.open_dialog(cx, move |dialog, _window, _cx| {
+            let input = state.clone();
+            let on_ok = view.clone();
+            let on_close = view.clone();
+            dialog
+                .title("New Profile")
+                .w(px(360.0))
+                .child(Input::new(&input))
+                .footer(
+                    DialogFooter::new()
+                        .child(
+                            DialogClose::new().child(Button::new("cancel-create").label("Cancel")),
+                        )
+                        .child(
+                            DialogAction::new()
+                                .child(Button::new("confirm-create").primary().label("Create")),
+                        ),
+                )
+                .on_ok(move |_, _window, cx| {
+                    on_ok.update(cx, |this, cx| {
+                        if let Some(input) = this.create_dialog.clone() {
+                            let name = input.read(cx).value().to_string();
+                            this.submit_create(name, cx);
+                        }
+                        // Stays open while the name is still empty.
+                        this.create_dialog.is_none()
+                    })
+                })
+                .on_close(move |_, _window, cx| {
+                    on_close.update(cx, |this, cx| {
+                        this.create_dialog = None;
+                        cx.notify();
+                    });
+                })
+        });
         cx.notify();
     }
 
@@ -429,7 +475,7 @@ impl LibraryView {
             .on_click(cx.listener(move |_, _: &ClickEvent, _, cx| {
                 cx.emit(LibraryEvent::Open(emit_id.clone()));
             }))
-            .child(profile_icon(profile, 96.0, theme))
+            .child(profile_icon(profile, 96.0))
             .child(
                 div()
                     .flex()
@@ -493,10 +539,11 @@ impl Render for LibraryView {
                     .children(placeholders)
                     .into_any_element()
             }
-            LoadState::Failed(message) => div()
-                .text_color(theme.danger)
-                .child(format!("Failed to load profiles: {message}"))
-                .into_any_element(),
+            LoadState::Failed(message) => Alert::error(
+                "profiles-load-failed",
+                format!("Failed to load profiles: {message}"),
+            )
+            .into_any_element(),
             LoadState::Loaded(profiles) if profiles.is_empty() => div()
                 .text_color(theme.text_muted)
                 .child("No profiles yet. Click \"Create Profile\" to make one, or drop an exported profile .zip here.")
@@ -515,42 +562,6 @@ impl Render for LibraryView {
             }
         };
 
-        let create_dialog =
-            self.create_dialog.clone().map(|input| {
-                crate::views::modal_overlay(
-                    &theme,
-                    px(360.0),
-                    [
-                        div()
-                            .font_weight(FontWeight::SEMIBOLD)
-                            .child("New Profile")
-                            .into_any_element(),
-                        Input::new(&input).into_any_element(),
-                        div()
-                            .flex()
-                            .gap_2()
-                            .justify_end()
-                            .child(Button::new("cancel-create").label("Cancel").on_click(
-                                cx.listener(|this, _, _window, cx| {
-                                    this.create_dialog = None;
-                                    cx.notify();
-                                }),
-                            ))
-                            .child(
-                                Button::new("confirm-create")
-                                    .primary()
-                                    .label("Create")
-                                    .on_click(cx.listener(|this, _, _window, cx| {
-                                        if let Some(input) = this.create_dialog.clone() {
-                                            let name = input.read(cx).value().to_string();
-                                            this.submit_create(name, cx);
-                                        }
-                                    })),
-                            )
-                            .into_any_element(),
-                    ],
-                )
-            });
         // First-run nudge: launching can't work until the game path is set
         // (startup auto-detect may have already filled it in).
         let setup_banner = app_settings::get(cx)
@@ -562,17 +573,13 @@ impl Render for LibraryView {
                     .mb_4()
                     .flex()
                     .items_center()
-                    .justify_between()
                     .gap_3()
-                    .rounded_md()
-                    .border_1()
-                    .border_color(theme.warning)
-                    .bg(theme.sidebar_background)
-                    .p_3()
                     .child(
-                        div()
-                            .text_color(theme.text)
-                            .child("Among Us path isn't configured — profiles can't launch yet."),
+                        Alert::warning(
+                            "library-setup-banner",
+                            "Among Us path isn't configured — profiles can't launch yet.",
+                        )
+                        .flex_1(),
                     )
                     .child(
                         Button::new("open-settings-banner")
@@ -599,13 +606,12 @@ impl Render for LibraryView {
             .child(self.render_header(cx))
             .children(setup_banner)
             .children(self.error.clone().map(|message| {
-                div()
+                Alert::error("library-error", message)
                     .mb_4()
-                    .rounded_md()
-                    .bg(rgb(0x7f1d1d))
-                    .p_3()
-                    .text_color(theme.text)
-                    .child(message)
+                    .on_close(cx.listener(|this, _, _window, cx| {
+                        this.error = None;
+                        cx.notify();
+                    }))
             }))
             .children(self.import_progress.map(|p| {
                 div()
@@ -622,6 +628,5 @@ impl Render for LibraryView {
                     .child(Progress::new("import-progress").value(p as f32))
             }))
             .child(body)
-            .children(create_dialog)
     }
 }

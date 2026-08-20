@@ -1,14 +1,20 @@
 //! Profile icon picker dialog. Lives as part of the library-detail page —
-//! state hangs off [`LibraryDetailView`], and the overlay only renders while
-//! `icon_dialog` is `Some`.
+//! state hangs off [`LibraryDetailView`], and the dialog is opened on the
+//! window's dialog layer while `icon_dialog` is `Some`.
 
 use gpui::*;
+use gpui_component::alert::Alert;
+use gpui_component::avatar::Avatar;
 use gpui_component::button::{Button, ButtonVariants};
-use gpui_component::{Icon, IconName};
+use gpui_component::dialog::{DialogAction, DialogClose, DialogFooter};
+use gpui_component::radio::Radio;
+use gpui_component::tab::TabBar;
+use gpui_component::{Icon, IconName, Sizable as _, WindowExt};
 
 use super::{LibraryDetailView, LoadState};
 use crate::backend::api;
-use crate::backend::services::profile_service::{self, ProfileEntry, ProfileIconSelection};
+use crate::backend::services::profile_service::{self, ProfileIconSelection};
+use crate::theme::ThemeExt;
 
 #[derive(Clone, Copy, PartialEq, Eq)]
 pub enum IconDialogMode {
@@ -25,7 +31,7 @@ pub struct IconDialogState {
 }
 
 impl LibraryDetailView {
-    pub(super) fn open_icon_dialog(&mut self, cx: &mut Context<Self>) {
+    pub(super) fn open_icon_dialog(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         let LoadState::Loaded(profile) = &self.state else {
             return;
         };
@@ -47,6 +53,43 @@ impl LibraryDetailView {
             selected_mod_id,
             pending_custom: None,
             error: None,
+        });
+        let view = cx.entity();
+        window.open_dialog(cx, move |dialog, _window, cx| {
+            let view = view.clone();
+            if view.read(cx).icon_dialog.is_none() {
+                return dialog;
+            }
+            let body = icon_dialog_body(&view, cx);
+            let on_ok = view.clone();
+            let on_close = view.clone();
+            dialog
+                .title("Edit Profile Icon")
+                .w(px(480.0))
+                .child(body)
+                .footer(
+                    DialogFooter::new()
+                        .child(
+                            DialogClose::new()
+                                .child(Button::new("icon-dialog-cancel").label("Cancel")),
+                        )
+                        .child(
+                            DialogAction::new()
+                                .child(Button::new("icon-dialog-save").primary().label("Save")),
+                        ),
+                )
+                // Saving is asynchronous (and can fail validation), so the
+                // dialog is dismissed by `save_icon` rather than on click.
+                .on_ok(move |_, window, cx| {
+                    on_ok.update(cx, |this, cx| this.save_icon(window, cx));
+                    false
+                })
+                .on_close(move |_, _window, cx| {
+                    on_close.update(cx, |this, cx| {
+                        this.icon_dialog = None;
+                        cx.notify();
+                    });
+                })
         });
         cx.notify();
     }
@@ -109,10 +152,11 @@ impl LibraryDetailView {
         .detach();
     }
 
-    pub(super) fn save_icon(&mut self, cx: &mut Context<Self>) {
+    pub(super) fn save_icon(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         let Some(state) = self.icon_dialog.as_ref() else {
             return;
         };
+        let window_handle = window.window_handle();
         let selection = match state.mode {
             IconDialogMode::Default => ProfileIconSelection::Default,
             IconDialogMode::Custom => {
@@ -123,8 +167,10 @@ impl LibraryDetailView {
                     && profile.custom_icon_extension.is_some();
                 match state.pending_custom.clone() {
                     Some((bytes, extension)) => ProfileIconSelection::Custom { bytes, extension },
+                    // Keeping the existing image is a no-op save: just close.
                     None if has_existing => {
                         self.icon_dialog = None;
+                        window.close_dialog(cx);
                         cx.notify();
                         return;
                     }
@@ -155,6 +201,7 @@ impl LibraryDetailView {
                 .background_executor()
                 .spawn(async move { profile_service::update_profile_icon(&id, selection) })
                 .await;
+            let saved = result.is_ok();
             let _ = this.update(cx, |this, cx| match result {
                 Ok(()) => {
                     this.icon_dialog = None;
@@ -167,47 +214,45 @@ impl LibraryDetailView {
                     cx.notify();
                 }
             });
+            if saved {
+                let _ = window_handle.update(cx, |_, window, cx| window.close_dialog(cx));
+            }
         })
         .detach();
     }
 }
 
-pub(super) fn render_icon_dialog(
-    state: &IconDialogState,
-    profile: &ProfileEntry,
-    mod_names: &std::collections::HashMap<String, String>,
-    theme: crate::theme::Theme,
-    cx: &mut Context<LibraryDetailView>,
-) -> AnyElement {
-    let mode = state.mode;
-    let mode_button = |id: &'static str, label: &'static str, target: IconDialogMode| {
-        let mut btn = Button::new(id).label(label).on_click(
-            cx.listener(move |this, _: &ClickEvent, _, cx| this.set_icon_mode(target, cx)),
-        );
-        if mode == target {
-            btn = btn.primary();
-        }
-        btn
-    };
+/// Body of the icon dialog: the mode tabs plus the panel for the selected
+/// mode. Read back out of the view on every frame, since the dialog lives in
+/// the window's dialog layer rather than in this view's element tree.
+fn icon_dialog_body(view: &Entity<LibraryDetailView>, cx: &App) -> AnyElement {
+    const MODES: [IconDialogMode; 3] = [
+        IconDialogMode::Default,
+        IconDialogMode::Custom,
+        IconDialogMode::Mod,
+    ];
 
-    let mode_row = div()
-        .flex()
-        .gap_2()
-        .child(mode_button(
-            "icon-mode-default",
-            "Default",
-            IconDialogMode::Default,
-        ))
-        .child(mode_button(
-            "icon-mode-custom",
-            "Custom Image",
-            IconDialogMode::Custom,
-        ))
-        .child(mode_button(
-            "icon-mode-mod",
-            "Installed Mod",
-            IconDialogMode::Mod,
-        ));
+    let theme = cx.theme().clone();
+    let this = view.read(cx);
+    let (Some(state), LoadState::Loaded(profile)) = (this.icon_dialog.as_ref(), &this.state) else {
+        return div().into_any_element();
+    };
+    let mod_names = &this.mod_names;
+    let mode = state.mode;
+
+    let on_mode = view.clone();
+    let mode_tabs = TabBar::new("icon-mode-tabs")
+        .segmented()
+        .selected_index(MODES.iter().position(|m| *m == mode).unwrap_or(0))
+        .child("Default")
+        .child("Custom Image")
+        .child("Installed Mod")
+        .on_click(move |ix: &usize, _window, cx| {
+            let Some(target) = MODES.get(*ix).copied() else {
+                return;
+            };
+            on_mode.update(cx, |this, cx| this.set_icon_mode(target, cx));
+        });
 
     let body: AnyElement = match mode {
         IconDialogMode::Default => div()
@@ -237,6 +282,7 @@ pub(super) fn render_icon_dialog(
                     .child("PNG, JPG, WEBP, GIF, BMP, or AVIF.")
                     .into_any_element()
             };
+            let on_pick = view.clone();
             div()
                 .flex()
                 .flex_col()
@@ -249,9 +295,9 @@ pub(super) fn render_icon_dialog(
                         } else {
                             "Choose Image"
                         })
-                        .on_click(cx.listener(|this, _, window, cx| {
-                            this.pick_custom_icon(window, cx);
-                        })),
+                        .on_click(move |_, window, cx| {
+                            on_pick.update(cx, |this, cx| this.pick_custom_icon(window, cx));
+                        }),
                 )
                 .child(status)
                 .into_any_element()
@@ -274,16 +320,32 @@ pub(super) fn render_icon_dialog(
                     .into_any_element()
             } else {
                 let selected = state.selected_mod_id.clone();
-                let theme_for_items = theme.clone();
                 let items: Vec<AnyElement> = mods
                     .into_iter()
                     .map(|mod_id| {
                         let is_selected = selected.as_deref() == Some(mod_id.as_str());
-                        let click_id = mod_id.clone();
                         let display_name = mod_names
                             .get(&mod_id)
                             .cloned()
                             .unwrap_or_else(|| mod_id.clone());
+                        // The row and the radio inside it are both hit targets,
+                        // so a click aimed straight at the radio still selects.
+                        let pick = |view: &Entity<LibraryDetailView>, mod_id: &str| {
+                            let view = view.clone();
+                            let mod_id = mod_id.to_string();
+                            move |cx: &mut App| {
+                                let mod_id = mod_id.clone();
+                                view.update(cx, |this, cx| {
+                                    if let Some(s) = this.icon_dialog.as_mut() {
+                                        s.selected_mod_id = Some(mod_id);
+                                        s.error = None;
+                                    }
+                                    cx.notify();
+                                });
+                            }
+                        };
+                        let on_row_click = pick(view, &mod_id);
+                        let on_radio_click = pick(view, &mod_id);
                         div()
                             .id(SharedString::from(format!("icon-mod-{mod_id}")))
                             .flex()
@@ -293,25 +355,24 @@ pub(super) fn render_icon_dialog(
                             .rounded_md()
                             .border_1()
                             .border_color(if is_selected {
-                                theme_for_items.primary
+                                theme.primary
                             } else {
-                                theme_for_items.border
+                                theme.border
                             })
                             .cursor_pointer()
-                            .hover(|s| s.bg(theme_for_items.hover))
-                            .on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
-                                if let Some(s) = this.icon_dialog.as_mut() {
-                                    s.selected_mod_id = Some(click_id.clone());
-                                    s.error = None;
-                                    cx.notify();
-                                }
-                            }))
+                            .hover(|s| s.bg(theme.hover))
+                            .on_click(move |_, _window, cx| on_row_click(cx))
                             .child(
-                                img(api::mod_thumbnail_url(&mod_id))
-                                    .w(px(36.0))
-                                    .h(px(36.0))
+                                Radio::new(SharedString::from(format!("icon-mod-{mod_id}-radio")))
+                                    .checked(is_selected)
+                                    .on_click(move |_, _window, cx| on_radio_click(cx)),
+                            )
+                            .child(
+                                Avatar::new()
+                                    .with_size(px(36.0))
                                     .rounded_md()
-                                    .object_fit(ObjectFit::Cover),
+                                    .placeholder(Icon::new(IconName::File))
+                                    .src(api::mod_thumbnail_url(&mod_id)),
                             )
                             .child(div().text_sm().truncate().child(display_name))
                             .into_any_element()
@@ -330,43 +391,17 @@ pub(super) fn render_icon_dialog(
         }
     };
 
-    let error_row = state
-        .error
-        .clone()
-        .map(|msg| div().text_sm().text_color(theme.danger).child(msg));
-
-    let mut items: Vec<AnyElement> = vec![
-        div()
-            .font_weight(FontWeight::SEMIBOLD)
-            .child("Edit Profile Icon")
-            .into_any_element(),
-        mode_row.into_any_element(),
-        body,
-    ];
-    items.extend(error_row.map(IntoElement::into_any_element));
-    items.push(
-        div()
-            .flex()
-            .gap_2()
-            .justify_end()
-            .child(
-                Button::new("icon-dialog-cancel")
-                    .label("Cancel")
-                    .on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
-                        this.icon_dialog = None;
-                        cx.notify();
-                    })),
-            )
-            .child(
-                Button::new("icon-dialog-save")
-                    .primary()
-                    .label("Save")
-                    .on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
-                        this.save_icon(cx);
-                    })),
-            )
-            .into_any_element(),
-    );
-
-    crate::views::modal_overlay(&theme, px(480.0), items).into_any_element()
+    div()
+        .flex()
+        .flex_col()
+        .gap_3()
+        .child(mode_tabs)
+        .child(body)
+        .children(
+            state
+                .error
+                .clone()
+                .map(|msg| Alert::error("icon-dialog-error", msg).small()),
+        )
+        .into_any_element()
 }

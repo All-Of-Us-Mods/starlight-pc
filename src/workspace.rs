@@ -833,7 +833,7 @@ impl Workspace {
             DeepLink::AddServer(server) => {
                 self.switch_tab(Tab::Servers, cx);
                 self.servers
-                    .update(cx, |view, cx| view.add_from_deep_link(*server, cx));
+                    .update(cx, |view, cx| view.add_from_deep_link(*server, window, cx));
             }
             // Launching a profile never reaches the UI.
             DeepLink::LaunchProfile(profile_id) => {
