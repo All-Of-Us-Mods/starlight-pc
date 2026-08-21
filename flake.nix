@@ -55,13 +55,13 @@
           cargoLock = {
             lockFile = ./Cargo.lock;
             outputHashes = {
-              "collections-0.1.0" = "sha256-+9t67JeCwlI01nuWp1jONiyl/4u1O7ruzPYEj1+Jp2Q=";
-              "gpui-component-0.5.2" = "sha256-gCXOFwEpiaZrJfNhO3yO37qr6qX5rs+9/8ff2TqZXAQ=";
-              "naga-29.0.3" = "sha256-jwPdrd2XLvK5ddEutR/39OLMh2JU3UXNWIcJKCndh+U=";
+              "collections-0.1.0" = "sha256-BuY0YCmTlkGqrDLjOTatzWa/VoOo4kQtPxL7QkwjWTA=";
+              "gpui-component-0.5.2" = "sha256-BOUSwFpSECRvsNi+F5psCO4mvgyF7SAbJ01r6RyH3A8=";
               "zed-font-kit-0.14.1-zed" = "sha256-KXygi0olNQi5yM8eaJVykNDtbPMDjT+cWPBF8UrtXR4=";
               "zed-reqwest-0.12.15-zed" = "sha256-p4SiUrOrbTlk/3bBrzN/mq/t+1Gzy2ot4nso6w6S+F8=";
               "zed-scap-0.0.8-zed" = "sha256-BihiQHlal/eRsktyf0GI3aSWsUCW7WcICMsC2Xvb7kw=";
               "zed-xim-0.4.0-zed" = "sha256-pRT4Sz1JU9ros47/7pmIW9kosWOGMOItcnNd+VrvnpE=";
+              "wasm_thread-0.3.3" = "sha256-+lRLCIk0S6Y5ORYjDKsYYHia2FtoSoh+rWkQh7mnPBE=";
             };
           };
 
