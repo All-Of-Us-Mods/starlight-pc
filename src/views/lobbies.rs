@@ -9,6 +9,7 @@ use std::time::Duration;
 
 use gpui::{prelude::FluentBuilder as _, *};
 use log::warn;
+use rust_i18n::t;
 
 use crate::backend::api::{self, Game, LobbyMod};
 use crate::backend::error::{AppError, AppResult};
@@ -378,7 +379,7 @@ impl LobbiesView {
             let on_ok = view.clone();
             let on_close = view.clone();
             dialog
-                .title(format!("Launch into lobby {code}"))
+                .title(t!("lobbies.dialog_title", code = code).to_string())
                 .w(px(460.0))
                 // A launch in flight can't be cancelled, so every way out of
                 // the dialog is closed off until it finishes or fails.
@@ -390,12 +391,12 @@ impl LobbiesView {
                     DialogFooter::new()
                         .child(if busy {
                             Button::new("launch-cancel")
-                                .label("Cancel")
+                                .label(t!("common.cancel"))
                                 .disabled(true)
                                 .into_any_element()
                         } else {
                             DialogClose::new()
-                                .child(Button::new("launch-cancel").label("Cancel"))
+                                .child(Button::new("launch-cancel").label(t!("common.cancel")))
                                 .into_any_element()
                         })
                         .child(
@@ -403,7 +404,11 @@ impl LobbiesView {
                                 Button::new("launch-confirm")
                                     .primary()
                                     .icon(Icon::new(IconName::Play))
-                                    .label(if busy { "Launching…" } else { "Launch" })
+                                    .label(if busy {
+                                        t!("lobbies.launching")
+                                    } else {
+                                        t!("lobbies.launch")
+                                    })
                                     .disabled(busy),
                             ),
                         ),
@@ -509,7 +514,7 @@ impl LobbiesView {
                         let mut message = String::new();
                         if !code.is_empty() {
                             this.copy_code(code.clone(), cx);
-                            message = format!("Code {code} copied to clipboard. ");
+                            message = t!("lobbies.code_copied", code = code).to_string();
                         }
                         message.push_str(&summary);
                         this.notice = Some(message);
@@ -569,14 +574,14 @@ impl LobbiesView {
                 .into_any_element(),
             LoadState::RegionsUnavailable(reason) => Alert::warning(
                 "lobbies-regions-unavailable",
-                format!("{reason} Add a region on the Servers tab to browse its lobbies."),
+                t!("lobbies.regions_unavailable", reason = reason).to_string(),
             )
-            .title("Could not read your Among Us regions")
+            .title(t!("lobbies.regions_unavailable_title"))
             .into_any_element(),
             LoadState::Loaded(rows) if rows.is_empty() => div()
                 .text_sm()
                 .text_color(theme.text_muted)
-                .child("No open lobbies found. Only servers that publish a lobby list appear here.")
+                .child(t!("lobbies.empty").to_string())
                 .into_any_element(),
             LoadState::Loaded(rows) => div()
                 .flex()
@@ -604,7 +609,7 @@ impl LobbiesView {
             .host_name
             .clone()
             .filter(|h| !h.is_empty())
-            .unwrap_or_else(|| "Unknown host".to_string());
+            .unwrap_or_else(|| t!("lobbies.unknown_host").to_string());
         let players = format!(
             "{}/{}",
             game.player_count.unwrap_or(0),
@@ -612,13 +617,16 @@ impl LobbiesView {
         );
         let meta_line = [
             players,
-            map_name(game.map_id).to_string(),
+            map_name(game.map_id),
             row.region_label.clone(),
         ]
         .join(" · ");
 
         let is_open = game.status.as_deref() == Some("Lobby");
-        let status_text = game.status.clone().unwrap_or_else(|| "Unknown".to_string());
+        let status_text = game
+            .status
+            .clone()
+            .unwrap_or_else(|| t!("common.unknown").to_string());
         let status_color = if is_open {
             theme.success
         } else {
@@ -687,10 +695,10 @@ impl LobbiesView {
                 let view = cx.entity();
                 Clipboard::new(SharedString::from(format!("copy-code-{ix}")))
                     .value(copy_code.clone())
-                    .tooltip("Copy join code")
+                    .tooltip(t!("lobbies.copy_code").to_string())
                     .on_copied(move |_, _window, cx| {
                         view.update(cx, |this, cx| {
-                            this.notice = Some("Code copied to clipboard.".into());
+                            this.notice = Some(t!("lobbies.code_copied_notice").to_string());
                             cx.notify();
                         });
                     })
@@ -700,7 +708,7 @@ impl LobbiesView {
                     .primary()
                     .xsmall()
                     .icon(Icon::new(IconName::Play))
-                    .label("Launch")
+                    .label(t!("lobbies.launch"))
                     .on_click(cx.listener(move |this, _, window, cx| {
                         this.open_launch_dialog(row_for_launch.clone(), window, cx)
                     })),
@@ -726,9 +734,9 @@ fn launch_dialog_body(view: &Entity<LobbiesView>, cx: &App) -> AnyElement {
         .iter()
         .map(|p| {
             let bep_subtitle = if p.bepinex_installed.is_some() {
-                "Modded profile"
+                t!("lobbies.modded_profile").to_string()
             } else {
-                "BepInEx will be installed"
+                t!("lobbies.bepinex_will_install").to_string()
             };
             let preview = preview_mod_installs(required_mods, &p.mods);
             let (detail, detail_color) = install_summary(&preview, &theme);
@@ -737,7 +745,7 @@ fn launch_dialog_body(view: &Entity<LobbiesView>, cx: &App) -> AnyElement {
                 TargetOption {
                     target: LaunchTarget::Existing(p.id.clone()),
                     title: &p.name,
-                    subtitle: bep_subtitle,
+                    subtitle: &bep_subtitle,
                     detail: &detail,
                     detail_color,
                 },
@@ -752,8 +760,8 @@ fn launch_dialog_body(view: &Entity<LobbiesView>, cx: &App) -> AnyElement {
         view,
         TargetOption {
             target: LaunchTarget::Temporary,
-            title: "Temporary profile",
-            subtitle: "Fresh profile, deleted automatically once the game closes",
+            title: t!("lobbies.temporary_profile").as_ref(),
+            subtitle: t!("lobbies.temporary_profile_subtitle").as_ref(),
             detail: &temp_detail,
             detail_color: temp_detail_color,
         },
@@ -765,9 +773,9 @@ fn launch_dialog_body(view: &Entity<LobbiesView>, cx: &App) -> AnyElement {
         div()
             .text_xs()
             .text_color(theme.text_muted)
-            .child(format!("Region: {}", dialog.lobby.region_label))
+            .child(t!("lobbies.region", region = dialog.lobby.region_label).to_string())
             .into_any_element(),
-        section_label("Profile", &theme).into_any_element(),
+        section_label(t!("lobbies.profile"), &theme).into_any_element(),
         div()
             .id("launch-profile-list")
             .flex()
@@ -783,11 +791,11 @@ fn launch_dialog_body(view: &Entity<LobbiesView>, cx: &App) -> AnyElement {
             div()
                 .text_xs()
                 .text_color(theme.text_muted)
-                .child("No mods required.")
+                .child(t!("lobbies.no_mods_required").to_string())
                 .into_any_element(),
         );
     } else {
-        items.push(section_label("Required mods", &theme).into_any_element());
+        items.push(section_label(t!("lobbies.required_mods"), &theme).into_any_element());
         items.push(mod_chip_row(required_mods, &theme));
     }
     if let Some(err) = &dialog.error {
@@ -917,13 +925,13 @@ impl Render for LobbiesView {
                             .flex()
                             .items_center()
                             .gap_2()
-                            .child(div().text_2xl().font_weight(FontWeight::BOLD).child("Lobbies"))
+                            .child(div().text_2xl().font_weight(FontWeight::BOLD).child(t!("nav.lobbies")))
                             .when(self.refreshing, |s| {
                                 s.child(
                                     div()
                                         .text_xs()
                                         .text_color(theme.text_muted)
-                                        .child("Refreshing…"),
+                                        .child(t!("lobbies.refreshing").to_string()),
                                 )
                             }),
                     )
@@ -931,7 +939,7 @@ impl Render for LobbiesView {
                         div()
                             .text_sm()
                             .text_color(theme.text_muted)
-                            .child("Open games on your enabled regions that publish a public lobby list. Launch in, then paste the copied code in-game."),
+                            .child(t!("lobbies.description").to_string()),
                     ),
             )
             .children(self.notice.clone().map(|message| {
@@ -947,7 +955,7 @@ impl Render for LobbiesView {
                     .flex()
                     .flex_col()
                     .gap_2()
-                    .child(section_label("Active lobbies", &theme))
+                    .child(section_label(t!("lobbies.active"), &theme))
                     .child(self.render_lobbies(&theme, cx)),
             )
     }
@@ -980,8 +988,8 @@ fn render_mod_chip(lobby_mod: &LobbyMod, theme: &Theme) -> AnyElement {
         (_, Some(info), None) => info.name.clone(),
         (Some(id), None, Some(version)) => format!("{id} {version}"),
         (Some(id), None, None) => id.to_string(),
-        (None, _, Some(version)) => format!("Unknown mod {version}"),
-        (None, _, None) => "Unknown mod".to_string(),
+        (None, _, Some(version)) => t!("lobbies.unknown_mod_version", version = version).to_string(),
+        (None, _, None) => t!("lobbies.unknown_mod").to_string(),
     };
 
     let icon: AnyElement = match (&resolved, lobby_mod.id.as_deref()) {
@@ -1071,7 +1079,7 @@ fn preview_mod_installs(required: &[LobbyMod], installed: &[ProfileModEntry]) ->
 fn install_summary(preview: &ModInstallPreview, theme: &Theme) -> (String, Hsla) {
     if preview.fully_satisfied() && preview.unavailable == 0 {
         return (
-            "All required mods already installed".to_string(),
+            t!("lobbies.all_installed").to_string(),
             theme.success,
         );
     }
@@ -1081,34 +1089,32 @@ fn install_summary(preview: &ModInstallPreview, theme: &Theme) -> (String, Hsla)
         let mut names = preview.to_install.clone();
         let extra = names.len().saturating_sub(MAX_NAMES);
         names.truncate(MAX_NAMES);
-        let mut text = format!("Will install: {}", names.join(", "));
+        let mut text = t!("lobbies.will_install", names = names.join(", ")).to_string();
         if extra > 0 {
-            text.push_str(&format!(", +{extra} more"));
+            text.push_str(t!("lobbies.more", count = extra).as_ref());
         }
         parts.push(text);
     }
     if preview.pending > 0 {
-        parts.push(format!("checking {} mod(s)…", preview.pending));
+        parts.push(t!("lobbies.checking", count = preview.pending).to_string());
     }
     if preview.unavailable > 0 {
-        parts.push(format!(
-            "{} not in the catalog (will be skipped)",
-            preview.unavailable
-        ));
+        parts.push(t!("lobbies.not_in_catalog", count = preview.unavailable).to_string());
     }
     (parts.join(" · "), theme.text_muted)
 }
 
-/// Map id → Among Us map name (see `MapNames.cs`).
-fn map_name(map_id: Option<u32>) -> &'static str {
+/// Map id → Among Us map name (see `MapNames.cs`). Map names are game
+/// content and stay untranslated; only the fallback is localized.
+fn map_name(map_id: Option<u32>) -> String {
     match map_id {
-        Some(0) => "The Skeld",
-        Some(1) => "MIRA HQ",
-        Some(2) => "Polus",
-        Some(3) => "Dleks",
-        Some(4) => "The Airship",
-        Some(5) => "The Fungle",
-        _ => "Unknown map",
+        Some(0) => "The Skeld".into(),
+        Some(1) => "MIRA HQ".into(),
+        Some(2) => "Polus".into(),
+        Some(3) => "Dleks".into(),
+        Some(4) => "The Airship".into(),
+        Some(5) => "The Fungle".into(),
+        _ => t!("lobbies.unknown_map").to_string(),
     }
 }
 
@@ -1121,7 +1127,7 @@ fn resolve_launch_profile(target: LaunchTarget) -> AppResult<(ProfileEntry, Opti
     match target {
         LaunchTarget::Existing(id) => {
             let profile = profile_service::get_profile_by_id(&id)?
-                .ok_or_else(|| AppError::validation("The selected profile no longer exists"))?;
+                .ok_or_else(|| AppError::validation(t!("lobbies.profile_gone").to_string()))?;
             Ok((profile, None))
         }
         LaunchTarget::Temporary => {
@@ -1185,23 +1191,19 @@ fn launch_into_lobby_for_profile(
 
     // Reload so the launch sees the freshly installed BepInEx / mods.
     let profile = profile_service::get_profile_by_id(&profile.id)?
-        .ok_or_else(|| AppError::validation("Profile disappeared before launch"))?;
+        .ok_or_else(|| AppError::validation(t!("lobbies.profile_gone_launch").to_string()))?;
     launch_service::launch_modded_for_profile(profile)?;
 
     let mut summary = if region_set {
-        "Launched with the region set to this lobby.".to_string()
+        t!("lobbies.launched_region_set").to_string()
     } else {
-        "Launched.".to_string()
+        t!("lobbies.launched").to_string()
     };
     if skipped > 0 {
-        summary.push_str(&format!(
-            " {skipped} required mod(s) weren't in the catalog and were skipped."
-        ));
+        summary.push_str(t!("lobbies.skipped_catalog", count = skipped).as_ref());
     }
     if failed > 0 {
-        summary.push_str(&format!(
-            " {failed} mod(s) failed to install and were skipped."
-        ));
+        summary.push_str(t!("lobbies.skipped_failed", count = failed).as_ref());
     }
     Ok(summary)
 }

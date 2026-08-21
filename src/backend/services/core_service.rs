@@ -71,6 +71,11 @@ fn default_theme_name() -> String {
     "Starlight".to_string()
 }
 
+/// Locale code used until the user picks a language.
+fn default_language() -> String {
+    "en".to_string()
+}
+
 #[derive(Default, Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum LinuxRunnerKind {
@@ -112,6 +117,10 @@ pub struct AppSettings {
     /// Name of the active JSON theme (see `crate::theme`).
     #[serde(default = "default_theme_name")]
     pub theme_name: String,
+    /// UI language as an rust-i18n locale code (e.g. "en"). Locales come from
+    /// the YAML files under `locales/`; unknown codes fall back to English.
+    #[serde(default = "default_language")]
+    pub language: String,
     #[serde(default = "default_true")]
     pub show_stars_background: bool,
     /// Width the user dragged the sidebar to; drives icon mode when small.
@@ -138,6 +147,7 @@ impl Default for AppSettings {
             linux_proton_steam_client_path: String::new(),
             linux_proton_use_steam_run: true,
             theme_name: default_theme_name(),
+            language: default_language(),
             show_stars_background: true,
             sidebar_width: default_sidebar_width(),
         }
@@ -162,6 +172,7 @@ pub struct AppSettingsPatch {
     pub linux_proton_steam_client_path: Option<String>,
     pub linux_proton_use_steam_run: Option<bool>,
     pub theme_name: Option<String>,
+    pub language: Option<String>,
     pub show_stars_background: Option<bool>,
     pub sidebar_width: Option<f32>,
 }
@@ -346,6 +357,9 @@ pub fn update_settings(patch: AppSettingsPatch) -> AppResult<AppSettings> {
     }
     if let Some(value) = patch.theme_name {
         settings.theme_name = value;
+    }
+    if let Some(value) = patch.language {
+        settings.language = value;
     }
     if let Some(value) = patch.show_stars_background {
         settings.show_stars_background = value;

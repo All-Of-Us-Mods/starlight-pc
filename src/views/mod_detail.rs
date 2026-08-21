@@ -12,9 +12,11 @@ use gpui_component::{
     tag::Tag,
     text::TextView,
 };
+use std::borrow::Cow;
 
 use crate::ui::icon::AppIcon;
 use log::warn;
+use rust_i18n::t;
 
 use crate::backend::api::{self, ModResponse, ModVersion, ModVersionInfo};
 use crate::backend::events::{self, BackendEvent};
@@ -149,7 +151,7 @@ impl ModDetailView {
     pub fn title(&self) -> SharedString {
         match &self.state {
             LoadState::Loaded(data) => data.mod_info.name.clone().into(),
-            _ => "Mod".into(),
+            _ => t!("mod.fallback_title").into(),
         }
     }
 
@@ -174,7 +176,7 @@ impl ModDetailView {
             new_profile: Some(NewProfileInput {
                 name_input: cx.new(|cx| {
                     InputState::new(window, cx)
-                        .placeholder("New profile name")
+                        .placeholder(t!("mod.new_profile_name").to_string())
                         .default_value(default_name)
                 }),
             }),
@@ -281,7 +283,7 @@ impl ModDetailView {
             panel.new_profile = Some(NewProfileInput {
                 name_input: cx.new(|cx| {
                     InputState::new(window, cx)
-                        .placeholder("New profile name")
+                        .placeholder(t!("mod.new_profile_name").to_string())
                         .default_value(default_name)
                 }),
             });
@@ -330,7 +332,7 @@ impl ModDetailView {
                 let name = np.name_input.read(cx).value().trim().to_string();
                 if name.is_empty() {
                     window.push_notification(
-                        Notification::warning("Profile name cannot be empty"),
+                        Notification::warning(t!("mod.empty_profile_name").to_string()),
                         cx,
                     );
                     return;
@@ -338,7 +340,7 @@ impl ModDetailView {
                 Some(name)
             }
             (None, None) => {
-                window.push_notification(Notification::warning("Pick a profile first"), cx);
+                window.push_notification(Notification::warning(t!("mod.pick_profile").to_string()), cx);
                 return;
             }
         };
@@ -375,11 +377,11 @@ impl ModDetailView {
         if let Some(panel) = self.install.as_mut() {
             panel.status = InstallStatus::Installing {
                 message: if needs_bepinex {
-                    "Installing BepInEx + mods…"
+                    t!("mod.installing_bepinex_mods")
                 } else {
-                    "Installing mods…"
+                    t!("mod.installing_mods")
                 }
-                .into(),
+                .to_string(),
                 progress: 0.0,
             };
         }
@@ -483,7 +485,7 @@ fn apply_progress_event(this: &mut ModDetailView, event: BackendEvent) {
             if matches!(p.target_type, BepInExTargetType::Profile)
                 && Some(p.target_id.as_str()) == panel.selected_profile_id.as_deref() =>
         {
-            *message = format!("BepInEx: {}", p.message);
+            *message = t!("mod.bepinex_progress", message = p.message).to_string();
             *progress = p.progress as f32;
         }
         BackendEvent::ModDownloadProgress(p) => {
@@ -604,7 +606,8 @@ impl Render for ModDetailView {
                 )
                 .into_any_element(),
             LoadState::Failed(e) => {
-                Alert::error("mod-load-failed", format!("Failed: {e}")).into_any_element()
+                Alert::error("mod-load-failed", t!("common.failed", error = e).to_string())
+                    .into_any_element()
             }
             LoadState::Loaded(data) => {
                 let m = &data.mod_info;
@@ -616,7 +619,7 @@ impl Render for ModDetailView {
                 let install_button = Button::new("install-mod")
                     .primary()
                     .icon(Icon::new(AppIcon::Download))
-                    .label(format!("Install v{}", latest_version_label))
+                    .label(t!("mod.install_version", version = latest_version_label))
                     .on_click(cx.listener(|this, _, window, cx| {
                         if this.install.is_some() {
                             this.close_install_panel(cx);
@@ -661,7 +664,7 @@ impl Render for ModDetailView {
                                 div()
                                     .text_sm()
                                     .text_color(theme.text_muted)
-                                    .child(format!("by {}", m.author)),
+                                    .child(t!("home.by_author", author = m.author).to_string()),
                             ),
                     )
                     .child(div().flex().justify_center().child(install_button))
@@ -674,9 +677,13 @@ impl Render for ModDetailView {
                             .text_sm()
                             .gap_4()
                             .text_color(theme.text_muted)
-                            .child(format!("{} downloads", format_count(m.downloads)))
-                            .child(format!("Updated {}", format::date_ms(m.updated_at)))
-                            .children(m.mod_type.clone().map(|t| format!("Type: {t}"))),
+                            .child(t!("mod.downloads", count = format_count(m.downloads)).to_string())
+                            .child(t!("mod.updated", date = format::date_ms(m.updated_at)).to_string())
+                            .children(
+                                m.mod_type
+                                    .clone()
+                                    .map(|t| t!("mod.type_label", kind = t).to_string()),
+                            ),
                     )
                     .children(m.tags.clone().filter(|tags| !tags.is_empty()).map(|tags| {
                         div()
@@ -699,7 +706,7 @@ impl Render for ModDetailView {
                             .flex()
                             .flex_col()
                             .gap_2()
-                            .child(section_label("About", &theme))
+                            .child(section_label(t!("mod.about"), &theme))
                             .child(
                                 div()
                                     .text_sm()
@@ -717,7 +724,7 @@ impl Render for ModDetailView {
                                 .rounded_lg()
                                 .bg(theme.hover)
                                 .p_3()
-                                .child(section_label("Changelog", &theme))
+                                .child(section_label(t!("mod.changelog"), &theme))
                                 .child(
                                     div().text_sm().line_height(px(22.0)).child(
                                         TextView::markdown("mod-changelog", changelog.clone()),
@@ -734,7 +741,7 @@ impl Render for ModDetailView {
                                     .flex()
                                     .flex_col()
                                     .gap_2()
-                                    .child(section_label("Links", &theme))
+                                    .child(section_label(t!("mod.links"), &theme))
                                     .child(
                                         div().flex().flex_wrap().gap_2().children(
                                             links
@@ -749,7 +756,7 @@ impl Render for ModDetailView {
                         div()
                             .text_xs()
                             .text_color(theme.text_muted)
-                            .child(format!("Licensed under {license}"))
+                            .child(t!("mod.licensed_under", license = license).to_string())
                     }))
                     .into_any_element()
             }
@@ -774,7 +781,7 @@ fn render_install_panel(
             div()
                 .text_xs()
                 .text_color(theme.text_muted)
-                .child("Resolving dependencies…")
+                .child(t!("mod.resolving").to_string())
                 .into_any_element(),
         ),
         InstallStatus::Installing { message, progress } => Some(
@@ -792,7 +799,7 @@ fn render_install_panel(
                 .into_any_element(),
         ),
         InstallStatus::Done => Some(
-            Alert::success("install-done", "Installed.")
+            Alert::success("install-done", t!("mod.installed").to_string())
                 .small()
                 .into_any_element(),
         ),
@@ -802,16 +809,18 @@ fn render_install_panel(
                 .items_center()
                 .gap_2()
                 .child(
-                    Alert::error("install-failed", format!("Failed: {e}"))
+                    Alert::error("install-failed", t!("common.failed", error = e).to_string())
                         .small()
                         .flex_1(),
                 )
                 .child(
                     // Re-resolve from scratch — a failed install can leave the
                     // panel's dependency state half-updated.
-                    Button::new("install-retry").label("Retry").on_click(
-                        cx.listener(|this, _, _window, cx| this.retry_install_resolve(cx)),
-                    ),
+                    Button::new("install-retry")
+                        .label(t!("common.retry"))
+                        .on_click(cx.listener(|this, _, _window, cx| {
+                            this.retry_install_resolve(cx)
+                        })),
                 )
                 .into_any_element(),
         ),
@@ -838,7 +847,7 @@ fn render_install_panel(
     let new_selected = panel.selected_profile_id.is_none();
     let new_profile_chip = Toggle::new("install-profile-new")
         .outline()
-        .label("+ New profile")
+        .label(t!("mod.new_profile_chip"))
         .checked(new_selected)
         .on_click(cx.listener(|this, _: &bool, window, cx| {
             this.select_new_profile(window, cx);
@@ -873,30 +882,33 @@ fn render_install_panel(
                 div()
                     .text_xs()
                     .text_color(theme.text_muted)
-                    .child("Created on install, using this mod's icon"),
+                    .child(t!("mod.created_on_install").to_string()),
             )
     });
 
     let dep_rows = panel.deps.iter().enumerate().map(|(ix, row)| {
-        let label = format!(
-            "{} v{}{}",
-            row.mod_name,
-            row.resolved_version,
-            if row.dependency_type.eq_ignore_ascii_case("optional") {
-                " (optional)"
+        let optional_suffix = if row.dependency_type.eq_ignore_ascii_case("optional") {
+            t!("mod.optional").to_string()
+        } else {
+            String::new()
+        };
+        let label = t!(
+            "mod.dep_label",
+            name = row.mod_name,
+            version = row.resolved_version,
+            optional = optional_suffix,
+        )
+        .to_string();
+        let detail = t!(
+            "mod.dep_detail",
+            id = row.mod_id,
+            constraint = if row.constraint.is_empty() {
+                Cow::Borrowed("*")
             } else {
-                ""
-            }
-        );
-        let detail = format!(
-            "{} — constraint {}",
-            row.mod_id,
-            if row.constraint.is_empty() {
-                "*"
-            } else {
-                row.constraint.as_str()
-            }
-        );
+                Cow::Owned(row.constraint.clone())
+            },
+        )
+        .to_string();
         let already = row.already_installed;
         div()
             .flex()
@@ -917,7 +929,7 @@ fn render_install_panel(
                     .text_color(theme.text_muted)
                     .pl_6()
                     .child(if already {
-                        format!("{detail} — already installed")
+                        t!("mod.dep_already_installed", detail = detail).to_string()
                     } else {
                         detail
                     }),
@@ -926,14 +938,14 @@ fn render_install_panel(
 
     let close_btn = Button::new("install-close")
         .ghost()
-        .label("Close")
+        .label(t!("common.close"))
         .on_click(cx.listener(|this, _, _window, cx| {
             this.close_install_panel(cx);
         }));
     let install_btn = Button::new("install-confirm")
         .primary()
         .icon(Icon::new(AppIcon::Download))
-        .label("Install")
+        .label(t!("mod.install"))
         .disabled(busy || (panel.selected_profile_id.is_none() && panel.new_profile.is_none()))
         .on_click(cx.listener(|this, _, window, cx| {
             this.run_install(window, cx);
@@ -948,10 +960,10 @@ fn render_install_panel(
         .border_1()
         .border_color(theme.border)
         .bg(theme.hover)
-        .child(section_label("Install into profile", theme))
+        .child(section_label(t!("mod.install_into"), theme))
         .child(div().flex().flex_wrap().gap_2().children(profile_chips))
         .children(new_profile_row)
-        .child(section_label("Version", theme))
+        .child(section_label(t!("mod.version"), theme))
         .child(div().flex().flex_wrap().gap_2().children(version_rows))
         .children(if panel.deps.is_empty() {
             None
@@ -961,18 +973,18 @@ fn render_install_panel(
                     .flex()
                     .flex_col()
                     .gap_2()
-                    .child(section_label("Dependencies", theme))
+                    .child(section_label(t!("mod.dependencies"), theme))
                     .children(dep_rows),
             )
         })
         .children(if panel.unresolved.is_empty() {
             None
         } else {
-            Some(div().text_xs().text_color(theme.text_muted).child(format!(
-                "{} dependencies could not be resolved and will be skipped: {}",
-                panel.unresolved.len(),
-                panel.unresolved.join(", ")
-            )))
+            Some(div().text_xs().text_color(theme.text_muted).child(t!(
+                "mod.unresolved",
+                count = panel.unresolved.len(),
+                list = panel.unresolved.join(", "),
+            ).to_string()))
         })
         .children(status_row)
         .child(

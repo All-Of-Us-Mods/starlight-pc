@@ -1,0 +1,319 @@
+# Starlight UI translations (rust-i18n v1 format: locale comes from the
+# filename suffix, e.g. app.en.yml -> "en"). English is the source of truth;
+# other locales only need the keys they translate (missing keys fall back to
+# English). Keys are namespaced by page: nav, home, explore, library, profile,
+# mod, news, lobbies, servers, settings, plus common.* shared bits.
+nav:
+  home: Home
+  explore: Explore
+  library: Library
+  servers: Servers
+  lobbies: Lobbies
+  settings: Settings
+common:
+  cancel: Cancel
+  save: Save
+  delete: Delete
+  close: Close
+  stop: Stop
+  clear: Clear
+  retry: Retry
+  unknown: Unknown
+  never: Never
+time:
+  hours_minutes: "%{hours}h %{minutes}m"
+  minutes: "%{minutes} min"
+  less_than_minute: "< 1 min"
+home:
+  news: News
+  trending: Trending Mods
+  by_author: "by %{author}"
+news:
+  unknown_date: Unknown date
+  posted_by: "Posted by %{author}"
+  content: Content
+explore:
+  search: Search mods...
+  load_failed: "Failed to load mods: %{error}"
+  no_mods: No mods found.
+  type_label: Type
+  sort:
+    downloads: Downloads
+    updated: Recently Updated
+    newest: Newest
+  type:
+    all: All
+    all_clients: All Clients
+    client_only: Client Only
+    host_only: Host Only
+library:
+  profile_name: Profile name
+  new_profile: New Profile
+  create: Create
+  create_profile: Create Profile
+  import: Import
+  import_profile: Import Profile
+  import_failed: "Import failed: %{error}"
+  importing: "Importing… %{percent}%"
+  add_mod_failed: "Add mod failed: %{error}"
+  unsupported_drop: Drop a mod .dll or an exported profile .zip
+  drop_dll_on_profile: Drop a mod .dll onto a profile to install it
+  vanilla_failed: "Vanilla launch failed: %{error}"
+  launch_vanilla: Launch Vanilla
+  stop_all: "Stop all (%{count})"
+  load_failed: "Failed to load profiles: %{error}"
+  empty: No profiles yet. Click "Create Profile" to make one, or drop an exported profile .zip here.
+  setup_banner: Among Us path isn't configured — profiles can't launch yet.
+  open_settings: Open Settings
+  card_stats: "%{mods} mods · %{played} played"
+  last_launched: "Last launched %{when}"
+mod:
+  fallback_title: Mod
+  new_profile_name: New profile name
+  empty_profile_name: Profile name cannot be empty
+  pick_profile: Pick a profile first
+  installing_bepinex_mods: Installing BepInEx + mods…
+  installing_mods: Installing mods…
+  bepinex_progress: "BepInEx: %{message}"
+  install_version: "Install v%{version}"
+  downloads: "%{count} downloads"
+  updated: "Updated %{date}"
+  type_label: "Type: %{kind}"
+  about: About
+  changelog: Changelog
+  links: Links
+  licensed_under: "Licensed under %{license}"
+  resolving: Resolving dependencies…
+  installed: Installed.
+  new_profile_chip: + New profile
+  created_on_install: Created on install, using this mod's icon
+  optional: " (optional)"
+  dep_label: "%{name} v%{version}%{optional}"
+  dep_detail: "%{id} — constraint %{constraint}"
+  dep_already_installed: "%{detail} — already installed"
+  unresolved: "%{count} dependencies could not be resolved and will be skipped: %{list}"
+  install_into: Install into profile
+  version: Version
+  dependencies: Dependencies
+  install: Install
+lobbies:
+  dialog_title: "Launch into lobby %{code}"
+  launching: Launching…
+  launch: Launch
+  code_copied: "Code %{code} copied to clipboard. "
+  code_copied_notice: Code copied to clipboard.
+  copy_code: Copy join code
+  regions_unavailable: "%{reason} Add a region on the Servers tab to browse its lobbies."
+  regions_unavailable_title: Could not read your Among Us regions
+  empty: No open lobbies found. Only servers that publish a lobby list appear here.
+  unknown_host: Unknown host
+  modded_profile: Modded profile
+  bepinex_will_install: BepInEx will be installed
+  temporary_profile: Temporary profile
+  temporary_profile_subtitle: Fresh profile, deleted automatically once the game closes
+  region: "Region: %{region}"
+  profile: Profile
+  no_mods_required: No mods required.
+  required_mods: Required mods
+  refreshing: Refreshing…
+  description: Open games on your enabled regions that publish a public lobby list. Launch in, then paste the copied code in-game.
+  active: Active lobbies
+  all_installed: All required mods already installed
+  will_install: "Will install: %{names}"
+  more: ", +%{count} more"
+  checking: "checking %{count} mod(s)…"
+  not_in_catalog: "%{count} not in the catalog (will be skipped)"
+  unknown_map: Unknown map
+  unknown_mod: Unknown mod
+  unknown_mod_version: "Unknown mod %{version}"
+  profile_gone: The selected profile no longer exists
+  profile_gone_launch: Profile disappeared before launch
+  launched_region_set: Launched with the region set to this lobby.
+  launched: Launched.
+  skipped_catalog: " %{count} required mod(s) weren't in the catalog and were skipped."
+  skipped_failed: " %{count} mod(s) failed to install and were skipped."
+servers:
+  added: 'Added region "%{name}"'
+  already_added: '"%{name}" is already added'
+  saved: 'Saved region "%{name}"'
+  my_server: My Server
+  edit_title: Edit server
+  add_title: Add custom server
+  name: Name
+  address: Address
+  port: Port
+  use_dtls: Use DTLS
+  add: Add
+  add_custom: Add custom
+  name_address_required: Name and address are required.
+  port_invalid: Port must be a number between 1 and 65535.
+  conflict: '"%{name}" already points at that address and port.'
+  address_exists: A region for that address already exists.
+  regioninfo_unreadable: Could not read regionInfo.json.
+  no_regions: No regions configured yet. Add one below.
+  edit_tooltip: Edit this server
+  remove_tooltip: Remove this server
+  load_failed: "Failed to load servers: %{error}"
+  none_available: No servers available.
+  all_added: All available servers have been added.
+  by_address: "by %{owner} · %{address}:%{port}"
+  description: Add community servers as Among Us regions. Restart the game to pick up changes.
+  installed_regions: Installed regions
+  available: Available servers
+profile:
+  fallback_title: Profile
+  this_profile: this profile
+  not_found: Profile not found
+  bepinex_not_installed: BepInEx not installed
+  bepinex_incompatible: This BepInEx install is incompatible with %{platform}
+  install_bepinex: Install BepInEx
+  instances_running: "%{count} instance(s) running"
+  launch_another: Launch another
+  open_folder: Open Folder
+  export_zip: Export ZIP
+  desktop_shortcut: Desktop Shortcut
+  exporting: "Exporting… %{percent}%"
+  exported: "Exported profile to %{dest}"
+  export_failed: "Export failed: %{error}"
+  shortcut_created: "Created shortcut at %{path}"
+  shortcut_failed: "Shortcut failed: %{error}"
+  rename_title: Rename Profile
+  rename_failed: "Rename failed: %{error}"
+  delete_title: Delete profile
+  delete_desc: 'Delete "%{name}"? Its mods and logs are removed from disk. This can''t be undone.'
+  delete_failed: "Delete failed: %{error}"
+  delete_profile: Delete Profile
+  delete_this_profile: Delete this profile
+  delete_this_profile_desc: Removes the profile, its mods and logs from disk. This can't be undone.
+  danger_zone: Danger zone
+  remove_mod_title: Remove mod
+  remove_mod_desc: 'Remove "%{name}" from this profile? Its files are deleted from disk.'
+  remove: Remove
+  remove_mod_failed: "Remove mod failed: %{error}"
+  toggle_failed: "Toggle failed: %{error}"
+  add_dll_prompt: Add BepInEx plugin (.dll)
+  drop_dll: Drop a mod .dll to add it to this profile
+  drop_zip: Import profile .zips from the Library page
+  added: 'Added region "%{name}"'
+  custom_mod: Custom
+  no_mods: No mods installed. Install from Explore, or drop a BepInEx plugin .dll here.
+  mods_heading: "Mods · %{count}"
+  install_mods: Install Mods
+  add_dll: Add DLL
+icon:
+  title: Edit Profile Icon
+  choose_image_prompt: Choose icon image
+  image_empty: Selected image is empty
+  image_read_failed: "Failed to read image: %{error}"
+  choose_custom: Choose an image for the custom icon
+  select_mod: Select an installed mod icon
+  update_failed: "Failed to update icon: %{error}"
+  tab_default: Default
+  tab_custom: Custom Image
+  tab_mod: Installed Mod
+  default_desc: Use the default profile icon.
+  image_ready: New image ready to save.
+  using_existing: Using existing custom image. Choose a new one to replace it.
+  formats: PNG, JPG, WEBP, GIF, BMP, or AVIF.
+  change_image: Change Image
+  choose_image: Choose Image
+  no_mods: No mods installed. Add a mod to use its icon.
+notify:
+  among_us_detected: "Among Us detected at %{path}"
+  among_us_not_found: "Couldn't find Among Us automatically — set its folder in Settings → Game before launching."
+migrate:
+  offer: "Found %{count} profile(s) from the previous Starlight version. Migrate them to this installation?"
+  title: Migrate profiles
+  action: Migrate
+  done: "Migrated %{count} profile(s)"
+  failed: "Migration failed: %{error}"
+titlebar:
+  stop_count: "Stop (%{count})"
+  launch: "Launch %{name}"
+  launch_failed: "Launch failed: %{error}"
+  stop_failed: "Stop failed: %{error}"
+update:
+  available: "Starlight %{version} is available."
+  title: Update available
+  restart: Restart & Update
+  failed: "Update failed: %{error}"
+settings:
+  page:
+    game: Game
+    launch: Launch
+    appearance: Appearance
+    bepinex: BepInEx
+    linux: Linux runtime
+    about: About
+  group:
+    installation: Installation
+    platform: Platform
+    behavior: Behavior
+    theme: Theme
+    cache: Cache
+    download_urls: Download URLs
+    runner: Runner
+    runner_desc: 'Steam launches via the Steam client (Steam must be running). For modded launches, set the game''s Steam launch options to WINEDLLOVERRIDES="winhttp=n,b" %command%.'
+  among_us_path: Among Us path
+  among_us_path_desc: Folder containing Among Us.exe.
+  auto_detect: Auto-detect
+  auto_detect_among_us: Auto-detect Among Us
+  auto_detect_desc: Search known install locations and set the path above.
+  game_platform: Game platform
+  game_platform_desc: Which storefront the game was installed from.
+  close_on_launch: Close Starlight when launching
+  close_on_launch_desc: Quit the app after starting the game.
+  multi_instance: Allow multiple instances
+  multi_instance_desc: "Permit launching more than one game window at a time. Extra instances run from a temporary copy of the profile, so they can start right away without clashing over BepInEx files."
+  theme: Theme
+  theme_desc: Drop gpui-component theme JSON files into the themes folder to add your own.
+  language: Language
+  language_desc: UI language for Starlight and its components.
+  themes_folder: Themes folder
+  open_themes_folder: Open Themes Folder
+  browse_themes: Browse Themes
+  themes_folder_desc: Bundled Starlight themes are rewritten on every launch, copy one to a new file before editing it.
+  stars_background: Floating stars background
+  stars_background_desc: Show the slowly drifting starfield behind pages.
+  cache_downloads: Cache BepInEx downloads
+  cache_downloads_desc: Reuse cached archives across profile installs.
+  cache:
+    x64: x64 cache
+    x86: x86 cache
+    cached: "Cached · %{size}"
+    not_cached: Not cached
+    path_unavailable: Cache path unavailable
+    download: Download
+    downloaded: "Downloaded BepInEx %{arch}"
+    download_failed: "BepInEx %{arch} download failed: %{error}"
+    cleared: "Cleared BepInEx %{arch} cache"
+    clear_failed: "Clear failed: %{error}"
+    path_error: "Cache path: %{error}"
+  bepinex_x64_url: BepInEx x64 URL
+  bepinex_x86_url: BepInEx x86 URL
+  download_urls_desc: Override the default release archive locations.
+  detected: "Among Us detected at %{path}"
+  detected_store: "Among Us (%{store}) detected at %{path}"
+  not_detected: Could not auto-detect Among Us installation
+  detection_failed: "Detection failed: %{error}"
+  linux:
+    detected: Linux runtime detected
+    auto_detect: Auto-detect Linux runtime
+    auto_detect_desc: Probe Steam/Proton + Wine prefixes from the Among Us path.
+    runner: Runner
+    runner_desc: 'Steam launches via the Steam client (Steam must be running). For modded launches, set the game''s Steam launch options to WINEDLLOVERRIDES="winhttp=n,b" %command%.'
+    runner_binary: Runner binary
+    wine_prefix: Wine prefix
+    region_info_path: RegionInfo.json path
+    region_info_desc: "Among Us' RegionInfo.json inside the Wine prefix, used for server management. Leave empty to derive it from the Wine prefix (drive_c/users/<your user>/AppData/LocalLow/Innersloth/Among Us)."
+    proton_compat: Proton compat data path
+    proton_compat_desc: The game's Steam compatdata folder (steamapps/compatdata/945360). Also used to locate RegionInfo.json for server management.
+    steam_run: Wrap Proton in steam-run
+    steam_run_desc: Launch Proton via steam-run (NixOS/non-FHS systems). Disable to run the Proton binary directly.
+  license: GNU GPLv3 License
+  view_source: View Source
+  open_data_folder: Open Data Folder
+  path:
+    select_folder: Select folder
+    select_file: Select file
+    browse: Browse

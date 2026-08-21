@@ -1,5 +1,6 @@
 use gpui::*;
 use log::warn;
+use rust_i18n::t;
 
 use std::path::PathBuf;
 
@@ -9,7 +10,7 @@ use crate::backend::services::profile_service::{self, ProfileEntry, ZipOp};
 use crate::backend::state::game_runtime;
 use crate::settings as app_settings;
 use crate::theme::ThemeExt;
-use crate::ui::file_drop::{self, DroppedFiles};
+use crate::ui::file_drop::DroppedFiles;
 use crate::ui::format;
 use crate::ui::icon::AppIcon;
 use crate::ui::profile_icon::profile_icon;
@@ -132,7 +133,9 @@ impl LibraryView {
     }
 
     fn open_create_dialog(&mut self, window: &mut Window, cx: &mut Context<Self>) {
-        let state = cx.new(|cx| InputState::new(window, cx).placeholder("Profile name"));
+        let state = cx.new(|cx| {
+            InputState::new(window, cx).placeholder(t!("library.profile_name").to_string())
+        });
         state.read(cx).focus_handle(cx).focus(window, cx);
         cx.subscribe_in(
             &state,
@@ -159,17 +162,21 @@ impl LibraryView {
             let on_ok = view.clone();
             let on_close = view.clone();
             dialog
-                .title("New Profile")
+                .title(t!("library.new_profile"))
                 .w(px(360.0))
                 .child(Input::new(&input))
                 .footer(
                     DialogFooter::new()
                         .child(
-                            DialogClose::new().child(Button::new("cancel-create").label("Cancel")),
+                            DialogClose::new()
+                                .child(Button::new("cancel-create").label(t!("common.cancel"))),
                         )
                         .child(
-                            DialogAction::new()
-                                .child(Button::new("confirm-create").primary().label("Create")),
+                            DialogAction::new().child(
+                                Button::new("confirm-create")
+                                    .primary()
+                                    .label(t!("library.create")),
+                            ),
                         ),
                 )
                 .on_ok(move |_, _window, cx| {
@@ -198,7 +205,7 @@ impl LibraryView {
             files: true,
             directories: false,
             multiple: false,
-            prompt: Some("Import".into()),
+            prompt: Some(t!("library.import").to_string().into()),
         });
         cx.spawn(async move |this, cx| {
             let Ok(Ok(Some(paths))) = receiver.await else {
@@ -235,7 +242,7 @@ impl LibraryView {
                 if let Err(e) = result {
                     warn!("import profile zip failed: {e}");
                     let _ = this.update(cx, |this, cx| {
-                        this.error = Some(format!("Import failed: {e}"));
+                        this.error = Some(t!("library.import_failed", error = e).to_string());
                         cx.notify();
                     });
                 }
@@ -273,7 +280,7 @@ impl LibraryView {
             let _ = this.update(cx, |this, cx| {
                 if let Err(e) = result {
                     warn!("add dropped mod failed: {e}");
-                    this.error = Some(format!("Add mod failed: {e}"));
+                    this.error = Some(t!("library.add_mod_failed", error = e).to_string());
                 }
                 this.refresh(cx);
             });
@@ -288,12 +295,12 @@ impl LibraryView {
         // Whatever the last drop said no longer applies.
         self.error = None;
         if dropped.is_empty() {
-            self.error = Some(file_drop::UNSUPPORTED_DROP.to_string());
+            self.error = Some(t!("library.unsupported_drop").to_string());
             cx.notify();
             return;
         }
         if !dropped.plugins.is_empty() {
-            self.error = Some("Drop a mod .dll onto a profile to install it".to_string());
+            self.error = Some(t!("library.drop_dll_on_profile").to_string());
         }
         cx.notify();
         self.import_archives(dropped.archives, cx);
@@ -310,7 +317,7 @@ impl LibraryView {
         let dropped = DroppedFiles::classify(paths);
         self.error = None;
         if dropped.is_empty() {
-            self.error = Some(file_drop::UNSUPPORTED_DROP.to_string());
+            self.error = Some(t!("library.unsupported_drop").to_string());
             cx.notify();
             return;
         }
@@ -350,7 +357,7 @@ impl LibraryView {
             let _ = this.update(cx, |this, cx| {
                 if let Err(e) = result {
                     warn!("vanilla launch failed: {e}");
-                    this.error = Some(format!("Vanilla launch failed: {e}"));
+                    this.error = Some(t!("library.vanilla_failed", error = e).to_string());
                     cx.notify();
                 }
             });
@@ -368,7 +375,7 @@ impl LibraryView {
             let _ = this.update(cx, |this, cx| {
                 if let Err(e) = result {
                     warn!("stop all failed: {e}");
-                    this.error = Some(format!("Stop failed: {e}"));
+                    this.error = Some(t!("titlebar.stop_failed", error = e).to_string());
                     cx.notify();
                 }
             });
@@ -383,15 +390,15 @@ impl LibraryView {
         let launch_or_stop = if running == 0 {
             Button::new("launch-vanilla")
                 .icon(Icon::new(IconName::Play))
-                .label("Launch Vanilla")
+                .label(t!("library.launch_vanilla"))
                 .on_click(cx.listener(|this, _, _window, cx| {
                     this.launch_vanilla(cx);
                 }))
         } else {
             let label = if running > 1 {
-                format!("Stop all ({running})")
+                t!("library.stop_all", count = running).to_string()
             } else {
-                "Stop".to_string()
+                t!("common.stop").to_string()
             };
             let mut btn = Button::new("stop-all")
                 .danger()
@@ -417,7 +424,7 @@ impl LibraryView {
                 div()
                     .text_2xl()
                     .font_weight(FontWeight::BOLD)
-                    .child("Library"),
+                    .child(t!("nav.library")),
             )
             .child(
                 div()
@@ -427,7 +434,7 @@ impl LibraryView {
                     .child(
                         Button::new("import-profile")
                             .icon(Icon::new(AppIcon::Download))
-                            .label("Import Profile")
+                            .label(t!("library.import_profile"))
                             .on_click(cx.listener(|this, _, _window, cx| {
                                 this.import_profile(cx);
                             })),
@@ -436,7 +443,7 @@ impl LibraryView {
                         Button::new("create-profile")
                             .primary()
                             .icon(Icon::new(IconName::Plus))
-                            .label("Create Profile")
+                            .label(t!("library.create_profile"))
                             .on_click(cx.listener(|this, _, window, cx| {
                                 this.open_create_dialog(window, cx);
                             })),
@@ -493,17 +500,17 @@ impl LibraryView {
                         div()
                             .text_xs()
                             .text_color(theme.warning)
-                            .child("BepInEx not installed")
+                            .child(t!("profile.bepinex_not_installed").to_string())
                     }))
-                    .child(div().text_xs().text_color(theme.text_muted).child(format!(
-                        "{} mods · {} played",
-                        profile.mods.len(),
-                        format::play_time(profile.total_play_time),
-                    )))
-                    .child(div().text_xs().text_color(theme.text_muted).child(format!(
-                        "Last launched {}",
-                        format::last_launched(profile.last_launched_at)
-                    ))),
+                    .child(div().text_xs().text_color(theme.text_muted).child(t!(
+                        "library.card_stats",
+                        mods = profile.mods.len(),
+                        played = format::play_time(profile.total_play_time),
+                    ).to_string()))
+                    .child(div().text_xs().text_color(theme.text_muted).child(t!(
+                        "library.last_launched",
+                        when = format::last_launched(profile.last_launched_at),
+                    ).to_string())),
             )
     }
 }
@@ -541,12 +548,12 @@ impl Render for LibraryView {
             }
             LoadState::Failed(message) => Alert::error(
                 "profiles-load-failed",
-                format!("Failed to load profiles: {message}"),
+                t!("library.load_failed", error = message).to_string(),
             )
             .into_any_element(),
             LoadState::Loaded(profiles) if profiles.is_empty() => div()
                 .text_color(theme.text_muted)
-                .child("No profiles yet. Click \"Create Profile\" to make one, or drop an exported profile .zip here.")
+                .child(t!("library.empty").to_string())
                 .into_any_element(),
             LoadState::Loaded(profiles) => {
                 let cards: Vec<AnyElement> = profiles
@@ -577,14 +584,14 @@ impl Render for LibraryView {
                     .child(
                         Alert::warning(
                             "library-setup-banner",
-                            "Among Us path isn't configured — profiles can't launch yet.",
+                            t!("library.setup_banner").to_string(),
                         )
                         .flex_1(),
                     )
                     .child(
                         Button::new("open-settings-banner")
                             .primary()
-                            .label("Open Settings")
+                            .label(t!("library.open_settings"))
                             .on_click(cx.listener(|_, _, _window, cx| {
                                 cx.emit(LibraryEvent::OpenSettings);
                             })),
@@ -623,7 +630,7 @@ impl Render for LibraryView {
                         div()
                             .text_sm()
                             .text_color(theme.text_muted)
-                            .child(format!("Importing… {p:.0}%")),
+                            .child(t!("library.importing", percent = format!("{p:.0}")).to_string()),
                     )
                     .child(Progress::new("import-progress").value(p as f32))
             }))

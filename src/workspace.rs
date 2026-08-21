@@ -1,6 +1,7 @@
 use gpui::prelude::FluentBuilder as _;
 use gpui::*;
 use log::warn;
+use rust_i18n::t;
 
 use crate::backend::deeplink::{self, DeepLink};
 use crate::backend::events::{self, BackendEvent};
@@ -60,14 +61,14 @@ pub enum Tab {
 }
 
 impl Tab {
-    fn label(self) -> &'static str {
+    fn label(self) -> gpui::SharedString {
         match self {
-            Tab::Home => "Home",
-            Tab::Explore => "Explore",
-            Tab::Library => "Library",
-            Tab::Servers => "Servers",
-            Tab::Lobbies => "Lobbies",
-            Tab::Settings => "Settings",
+            Tab::Home => t!("nav.home").into(),
+            Tab::Explore => t!("nav.explore").into(),
+            Tab::Library => t!("nav.library").into(),
+            Tab::Servers => t!("nav.servers").into(),
+            Tab::Lobbies => t!("nav.lobbies").into(),
+            Tab::Settings => t!("nav.settings").into(),
         }
     }
 
@@ -284,16 +285,13 @@ impl Workspace {
                         },
                     );
                     window.push_notification(
-                        Notification::success(format!("Among Us detected at {path}")),
+                        Notification::success(t!("notify.among_us_detected", path = path).to_string()),
                         cx,
                     );
                 }
                 None => {
                     window.push_notification(
-                        Notification::warning(
-                            "Couldn't find Among Us automatically — set its folder in \
-                             Settings → Game before launching.",
-                        ),
+                        Notification::warning(t!("notify.among_us_not_found").to_string()),
                         cx,
                     );
                 }
@@ -332,18 +330,17 @@ impl Workspace {
                 return;
             }
             let _ = window_handle.update(cx, |_, window, cx| {
-                let plural = if pending == 1 { "" } else { "s" };
-                let notification = Notification::info(format!(
-                    "Found {pending} profile{plural} from the previous Starlight version. \
-                     Migrate them to this installation?"
-                ))
-                .title("Migrate profiles")
+                let notification = Notification::info(t!(
+                    "migrate.offer",
+                    count = pending,
+                ).to_string())
+                .title(t!("migrate.title"))
                 .autohide(false)
                 .action(move |_, _window, cx| {
                     let library = library.clone();
                     Button::new("migrate-profiles")
                         .primary()
-                        .label("Migrate")
+                        .label(t!("migrate.action"))
                         .on_click(cx.listener(move |this, _, window, cx| {
                             Self::run_legacy_migration(library.clone(), window, cx);
                             this.dismiss(window, cx);
@@ -368,9 +365,8 @@ impl Workspace {
                 .await;
             let _ = window_handle.update(cx, |_, window, cx| match result {
                 Ok(count) => {
-                    let plural = if count == 1 { "" } else { "s" };
                     window.push_notification(
-                        Notification::success(format!("Migrated {count} profile{plural}")),
+                        Notification::success(t!("migrate.done", count = count).to_string()),
                         cx,
                     );
                     library.update(cx, |library, cx| library.refresh(cx));
@@ -378,7 +374,7 @@ impl Workspace {
                 Err(e) => {
                     warn!("legacy profile migration failed: {e}");
                     window.push_notification(
-                        Notification::error(format!("Migration failed: {e}")),
+                        Notification::error(t!("migrate.failed", error = e).to_string()),
                         cx,
                     );
                 }
@@ -508,12 +504,12 @@ impl Workspace {
 
     fn current_title(&self, cx: &App) -> SharedString {
         match self.current() {
-            Page::Home => "Home".into(),
-            Page::Explore => "Explore".into(),
-            Page::Library => "Library".into(),
-            Page::Servers => "Servers".into(),
-            Page::Lobbies => "Lobbies".into(),
-            Page::Settings => "Settings".into(),
+            Page::Home => t!("nav.home").into(),
+            Page::Explore => t!("nav.explore").into(),
+            Page::Library => t!("nav.library").into(),
+            Page::Servers => t!("nav.servers").into(),
+            Page::Lobbies => t!("nav.lobbies").into(),
+            Page::Settings => t!("nav.settings").into(),
             Page::ModDetail(v) => v.read(cx).title(),
             Page::LibraryDetail(v) => v.read(cx).title(),
             Page::NewsDetail(v) => v.read(cx).title(),
@@ -736,9 +732,9 @@ impl Workspace {
     fn render_launch(&self, cx: &mut Context<Self>) -> Option<impl IntoElement> {
         let button = if self.running_count > 0 {
             let label = if self.running_count > 1 {
-                format!("Stop ({})", self.running_count)
+                t!("titlebar.stop_count", count = self.running_count).to_string()
             } else {
-                "Stop".to_string()
+                t!("common.stop").to_string()
             };
             let mut btn = Button::new("titlebar-launch")
                 .danger()
@@ -758,7 +754,7 @@ impl Workspace {
                 .primary()
                 .small()
                 .icon(Icon::new(IconName::Play))
-                .label(format!("Launch {name}"))
+                .label(t!("titlebar.launch", name = name))
                 .on_click(cx.listener(|this, _, window, cx| this.launch_last(window, cx)))
         };
         Some(
@@ -784,8 +780,10 @@ impl Workspace {
             if let Err(e) = result {
                 warn!("Title-bar launch failed: {e}");
                 let _ = window_handle.update(cx, |_, window, cx| {
-                    window
-                        .push_notification(Notification::error(format!("Launch failed: {e}")), cx);
+                    window.push_notification(
+                        Notification::error(t!("titlebar.launch_failed", error = e).to_string()),
+                        cx,
+                    );
                 });
             }
         })
@@ -803,7 +801,10 @@ impl Workspace {
             if let Err(e) = result {
                 warn!("Title-bar stop failed: {e}");
                 let _ = window_handle.update(cx, |_, window, cx| {
-                    window.push_notification(Notification::error(format!("Stop failed: {e}")), cx);
+                    window.push_notification(
+                        Notification::error(t!("titlebar.stop_failed", error = e).to_string()),
+                        cx,
+                    );
                 });
             }
         })
@@ -962,12 +963,12 @@ impl Render for Workspace {
 /// process.
 #[cfg(windows)]
 fn update_notification(info: crate::backend::services::update_service::UpdateInfo) -> Notification {
-    Notification::info(format!("Starlight {} is available.", info.version))
-        .title("Update available")
+    Notification::info(t!("update.available", version = info.version).to_string())
+        .title(t!("update.title"))
         .action(move |_, _, _| {
             let info = info.clone();
             Button::new("install-update")
-                .label("Restart & Update")
+                .label(t!("update.restart"))
                 .primary()
                 .on_click(move |_, window, cx| {
                     install_update(info.clone(), window, cx);
@@ -996,8 +997,10 @@ fn install_update(
             Err(e) => {
                 warn!("update install failed: {e}");
                 let _ = window_handle.update(cx, |_, window, cx| {
-                    window
-                        .push_notification(Notification::error(format!("Update failed: {e}")), cx);
+                    window.push_notification(
+                        Notification::error(t!("update.failed", error = e).to_string()),
+                        cx,
+                    );
                 });
             }
         }

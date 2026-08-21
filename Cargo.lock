@@ -18,6 +18,7 @@ dependencies = [
  "log",
  "reqwest",
  "reqwest_client",
+ "rust-i18n",
  "semver",
  "serde",
  "serde_json",

@@ -3,6 +3,17 @@
 #![cfg_attr(all(windows, not(debug_assertions)), windows_subsystem = "windows")]
 
 use gpui::*;
+use std::borrow::Cow;
+
+// Registers the app's `locales/` directory as a translation backend (merged
+// with gpui-component's built-ins via `extend!` below). English is the source
+// of truth; other languages only need to supply the keys they translate.
+// Must sit above the `mod`s so the `t!` macro is visible in every module.
+//
+// Uses the v1 locale format (locale from the filename suffix, e.g.
+// `app.en.yml`): rust-i18n 4.2.1's `_version: 2` parser mis-parses keys
+// nested deeper than two segments, scattering them into bogus locales.
+rust_i18n::i18n!("locales", fallback = "en");
 
 mod app;
 mod backend;
@@ -11,6 +22,42 @@ mod theme;
 mod ui;
 mod views;
 mod workspace;
+
+/// (locale code, native display name) for every translated locale, in a
+/// stable order. Drives the Settings → Appearance language dropdown.
+pub fn available_languages() -> Vec<(String, String)> {
+    let names = [
+        ("en", "English"),
+        ("de", "Deutsch"),
+        ("fr", "Français"),
+        ("es", "Español"),
+        ("pt-BR", "Português (Brasil)"),
+        ("ru", "Русский"),
+        ("ja", "日本語"),
+        ("zh-CN", "简体中文"),
+    ];
+    let mut codes: Vec<String> = rust_i18n::available_locales!()
+        .into_iter()
+        .map(Cow::into_owned)
+        .collect();
+    codes.sort_by_key(|code| {
+        names
+            .iter()
+            .position(|(name, _)| name == code)
+            .unwrap_or(usize::MAX)
+    });
+    codes
+        .into_iter()
+        .map(|code| {
+            let name = names
+                .iter()
+                .find(|(known, _)| *known == code)
+                .map(|(_, name)| *name)
+                .unwrap_or(code.as_str());
+            (code.to_string(), name.to_string())
+        })
+        .collect()
+}
 
 use backend::deeplink::{self, DeepLink};
 use backend::single_instance;
@@ -146,11 +193,15 @@ fn main() {
         .with_assets(ui::icon::EmbeddedAssets)
         .with_http_client(http)
         .run(move |cx: &mut App| {
+            // Merge our locale overrides into gpui-component's translations
+            // before any component renders. Must run exactly once.
+            rust_i18n::extend!(gpui_component);
             gpui_component::init(cx);
             gpui_component::Theme::change(gpui_component::ThemeMode::Dark, None, cx);
             ui::log_language::register();
-            // Settings first — the theme preset comes from them.
+            // Settings first — the theme preset and language come from them.
             settings::init(cx);
+            rust_i18n::set_locale(&settings::get(cx).language);
             theme::init(cx);
             backend::init(cx);
 
@@ -216,4 +267,31 @@ fn main() {
                 handle_deep_link_url(url);
             }
         });
+}
+
+#[cfg(test)]
+mod i18n_tests {
+    // Guards against regressions in locale loading: rust-i18n 4.2.1's v2
+    // parser silently mis-files keys nested deeper than two segments (see the
+    // note on `i18n!` above), which used to leave most strings untranslated.
+    #[test]
+    fn shallow_and_deep_keys_resolve() {
+        rust_i18n::set_locale("en");
+        assert_eq!(rust_i18n::t!("nav.home"), "Home");
+        assert_eq!(rust_i18n::t!("settings.page.appearance"), "Appearance");
+        assert_eq!(
+            rust_i18n::t!("profile.delete_desc", name = "X"),
+            "Delete \"X\"? Its mods and logs are removed from disk. This can't be undone."
+        );
+        assert_eq!(
+            rust_i18n::t!("titlebar.launch", name = "Foo"),
+            "Launch Foo"
+        );
+    }
+
+    #[test]
+    fn only_real_locales_are_available() {
+        let locales = crate::available_languages();
+        assert_eq!(locales, vec![("en".to_string(), "English".to_string())]);
+    }
 }

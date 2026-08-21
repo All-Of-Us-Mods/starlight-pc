@@ -21,6 +21,7 @@ use crate::backend::services::{
 use crate::settings as app_settings;
 use crate::theme::ThemeExt;
 use crate::ui::icon::AppIcon;
+use rust_i18n::t;
 
 type PathSetter = Rc<dyn Fn(SharedString, &mut App)>;
 
@@ -75,13 +76,13 @@ fn format_bytes(bytes: u64) -> String {
 /// Build the download/clear row + status description for one BepInEx cache
 /// architecture. The cache is sized once here and reused for both the "Clear"
 /// button's visibility and the description, instead of stat-ing the file twice.
-fn cache_item(arch: &'static str, label: &'static str) -> SettingItem {
+fn cache_item(arch: &'static str, label: gpui::SharedString) -> SettingItem {
     let (present, status): (bool, SharedString) = match core_service::get_bepinex_cache_path(arch) {
         Ok(path) => match bepinex_service::cache_size(&path) {
-            Some(size) => (true, format!("Cached · {}", format_bytes(size)).into()),
-            None => (false, "Not cached".into()),
+            Some(size) => (true, t!("settings.cache.cached", size = format_bytes(size)).into()),
+            None => (false, t!("settings.cache.not_cached").into()),
         },
-        Err(_) => (false, "Cache path unavailable".into()),
+        Err(_) => (false, t!("settings.cache.path_unavailable").into()),
     };
     stacked_item(
         label,
@@ -93,7 +94,7 @@ fn cache_item(arch: &'static str, label: &'static str) -> SettingItem {
                 .child(
                     Button::new(SharedString::from(format!("cache-{arch}")))
                         .icon(Icon::new(AppIcon::Download))
-                        .label("Download")
+                        .label(t!("settings.cache.download"))
                         .on_click(move |_, window, cx| download_bepinex_cache(arch, window, cx)),
                 )
                 .when(present, |row| {
@@ -101,7 +102,7 @@ fn cache_item(arch: &'static str, label: &'static str) -> SettingItem {
                         Button::new(SharedString::from(format!("clear-{arch}")))
                             .danger()
                             .icon(Icon::new(IconName::Delete))
-                            .label("Clear")
+                            .label(t!("common.clear"))
                             .on_click(move |_, window, cx| clear_bepinex_cache(arch, window, cx)),
                     )
                 })
@@ -176,6 +177,20 @@ fn patch_theme_name(value: SharedString, cx: &mut App) {
         },
     );
     crate::theme::apply(cx, &value);
+}
+
+fn patch_language(value: SharedString, cx: &mut App) {
+    app_settings::update(
+        cx,
+        AppSettingsPatch {
+            language: Some(value.to_string()),
+            ..Default::default()
+        },
+    );
+    rust_i18n::set_locale(&value);
+    // The sidebar and title bar live outside this view's tree and don't
+    // observe settings, so force everything to re-render in the new locale.
+    cx.refresh_windows();
 }
 
 fn patch_show_stars_background(value: bool, cx: &mut App) {
@@ -329,9 +344,9 @@ fn path_field(
         }
 
         let prompt: SharedString = if directories_only {
-            "Select folder".into()
+            t!("settings.path.select_folder").into()
         } else {
-            "Select file".into()
+            t!("settings.path.select_file").into()
         };
         let button_id: SharedString = format!(
             "path-browse-{}-{}-{}-{}",
@@ -356,7 +371,7 @@ fn path_field(
         div().flex().gap_2().child(input_el).child(
             Button::new(button_id)
                 .icon(Icon::new(IconName::FolderOpen))
-                .label("Browse")
+                .label(t!("settings.path.browse"))
                 .with_size(options.size())
                 .on_click(move |_, window, cx| {
                     let receiver = cx.prompt_for_paths(PathPromptOptions {
@@ -411,11 +426,14 @@ fn detect_linux_runtime(window: &mut Window, cx: &mut App) {
                     ..Default::default()
                 },
             );
-            window.push_notification(Notification::success("Linux runtime detected"), cx);
+            window.push_notification(Notification::success(t!("settings.linux.detected").to_string()), cx);
         }
         Err(e) => {
             warn!("detect_linux_runner failed: {e}");
-            window.push_notification(Notification::error(format!("Detection failed: {e}")), cx);
+            window.push_notification(
+                Notification::error(t!("settings.detection_failed", error = e).to_string()),
+                cx,
+            );
         }
     }
 }
@@ -438,20 +456,23 @@ fn detect_among_us(window: &mut Window, cx: &mut App) {
                 },
             );
             let msg = match detected_platform.as_deref() {
-                Some(p) => format!("Among Us ({p}) detected at {path}"),
-                None => format!("Among Us detected at {path}"),
+                Some(p) => t!("settings.detected_store", store = p, path = path).to_string(),
+                None => t!("settings.detected", path = path).to_string(),
             };
             window.push_notification(Notification::success(msg), cx);
         }
         Ok(None) => {
             window.push_notification(
-                Notification::warning("Could not auto-detect Among Us installation"),
+                Notification::warning(t!("settings.not_detected").to_string()),
                 cx,
             );
         }
         Err(e) => {
             warn!("detect_among_us failed: {e}");
-            window.push_notification(Notification::error(format!("Detection failed: {e}")), cx);
+            window.push_notification(
+                Notification::error(t!("settings.detection_failed", error = e).to_string()),
+                cx,
+            );
         }
     }
 }
@@ -462,7 +483,7 @@ fn download_bepinex_cache(arch: &'static str, window: &mut Window, cx: &mut App)
         Ok(p) => p,
         Err(e) => {
             window.push_notification(
-                Notification::error(format!("Cache path resolution failed: {e}")),
+                Notification::error(t!("settings.cache.path_error", error = e).to_string()),
                 cx,
             );
             return;
@@ -483,13 +504,15 @@ fn download_bepinex_cache(arch: &'static str, window: &mut Window, cx: &mut App)
             .await;
         let _ = window_handle.update(cx, |_, window, cx| match result {
             Ok(()) => window.push_notification(
-                Notification::success(format!("Downloaded BepInEx {arch}")),
+                Notification::success(t!("settings.cache.downloaded", arch = arch).to_string()),
                 cx,
             ),
             Err(e) => {
                 warn!("BepInEx cache download ({arch}) failed: {e}");
                 window.push_notification(
-                    Notification::error(format!("BepInEx {arch} download failed: {e}")),
+                    Notification::error(
+                        t!("settings.cache.download_failed", arch = arch, error = e).to_string(),
+                    ),
                     cx,
                 );
             }
@@ -502,16 +525,22 @@ fn clear_bepinex_cache(arch: &'static str, window: &mut Window, cx: &mut App) {
     match core_service::get_bepinex_cache_path(arch) {
         Ok(path) => match bepinex_service::clear_cache(path, arch.to_string()) {
             Ok(()) => window.push_notification(
-                Notification::success(format!("Cleared BepInEx {arch} cache")),
+                Notification::success(t!("settings.cache.cleared", arch = arch).to_string()),
                 cx,
             ),
             Err(e) => {
                 warn!("clear_bepinex_cache failed: {e}");
-                window.push_notification(Notification::error(format!("Clear failed: {e}")), cx);
+                window.push_notification(
+                    Notification::error(t!("settings.cache.clear_failed", error = e).to_string()),
+                    cx,
+                );
             }
         },
         Err(e) => {
-            window.push_notification(Notification::error(format!("Cache path: {e}")), cx);
+            window.push_notification(
+                Notification::error(t!("settings.cache.path_error", error = e).to_string()),
+                cx,
+            );
         }
     }
 }
@@ -542,31 +571,33 @@ impl Render for SettingsView {
         let theme = cx.theme().clone();
 
         let game_groups = vec![
-            SettingGroup::new().title("Installation").items(vec![
-                stacked_item(
-                    "Among Us path",
-                    path_field(
-                        "among-us",
-                        true,
-                        |cx| app_settings::get(cx).among_us_path.clone().into(),
-                        patch_among_us_path,
-                    ),
-                )
-                .description("Folder containing Among Us.exe."),
-                stacked_item(
-                    "Auto-detect",
-                    SettingField::render(|_, _, _| {
-                        Button::new("detect-among-us")
-                            .icon(Icon::new(AppIcon::Compass))
-                            .label("Auto-detect Among Us")
-                            .on_click(|_, window, cx| detect_among_us(window, cx))
-                    }),
-                )
-                .description("Search known install locations and set the path above."),
-            ]),
-            SettingGroup::new().title("Platform").items(vec![
+            SettingGroup::new()
+                .title(t!("settings.group.installation"))
+                .items(vec![
+                    stacked_item(
+                        t!("settings.among_us_path"),
+                        path_field(
+                            "among-us",
+                            true,
+                            |cx| app_settings::get(cx).among_us_path.clone().into(),
+                            patch_among_us_path,
+                        ),
+                    )
+                    .description(t!("settings.among_us_path_desc").to_string()),
+                    stacked_item(
+                        t!("settings.auto_detect"),
+                        SettingField::render(|_, _, _| {
+                            Button::new("detect-among-us")
+                                .icon(Icon::new(AppIcon::Compass))
+                                .label(t!("settings.auto_detect_among_us"))
+                                .on_click(|_, window, cx| detect_among_us(window, cx))
+                        }),
+                    )
+                    .description(t!("settings.auto_detect_desc").to_string()),
+                ]),
+            SettingGroup::new().title(t!("settings.group.platform")).items(vec![
                 SettingItem::new(
-                    "Game platform",
+                    t!("settings.game_platform"),
                     SettingField::dropdown(
                         vec![
                             ("steam".into(), "Steam".into()),
@@ -581,59 +612,66 @@ impl Render for SettingsView {
                         patch_platform,
                     ),
                 )
-                .description("Which storefront the game was installed from."),
+                .description(t!("settings.game_platform_desc").to_string()),
             ]),
         ];
-        let game_page = SettingPage::new("Game")
+        let game_page = SettingPage::new(t!("settings.page.game"))
             .default_open(true)
             .groups(game_groups);
 
         let launch_items = vec![
             SettingItem::new(
-                "Close Starlight when launching",
+                t!("settings.close_on_launch"),
                 SettingField::switch(
                     |cx| app_settings::get(cx).close_on_launch,
                     patch_close_on_launch,
                 ),
             )
-            .description("Quit the app after starting the game."),
+            .description(t!("settings.close_on_launch_desc").to_string()),
             SettingItem::new(
-                "Allow multiple instances",
+                t!("settings.multi_instance"),
                 SettingField::switch(
                     |cx| app_settings::get(cx).allow_multi_instance_launch,
                     patch_multi_instance,
                 ),
             )
-            .description(
-                "Permit launching more than one game window at a time. Extra instances run \
-                 from a temporary copy of the profile, so they can start right away without \
-                 clashing over BepInEx files.",
-            ),
+            .description(t!("settings.multi_instance_desc").to_string()),
         ];
-        let launch_page = SettingPage::new("Launch")
-            .group(SettingGroup::new().title("Behavior").items(launch_items));
+        let launch_page = SettingPage::new(t!("settings.page.launch"))
+            .group(SettingGroup::new().title(t!("settings.group.behavior")).items(launch_items));
 
         let theme_options: Vec<(SharedString, SharedString)> = crate::theme::theme_names(cx)
             .into_iter()
             .map(|name| (name.clone(), name))
             .collect();
 
-        let appearance_page =
-            SettingPage::new("Appearance").group(SettingGroup::new().title("Theme").items(vec![
+        let language_options: Vec<(SharedString, SharedString)> = crate::available_languages()
+            .into_iter()
+            .map(|(code, name)| (code.into(), name.into()))
+            .collect();
+
+        let appearance_page = SettingPage::new(t!("settings.page.appearance")).group(
+            SettingGroup::new().title(t!("settings.group.theme")).items(vec![
                 SettingItem::new(
-                    "Theme",
+                    t!("settings.theme"),
                     SettingField::scrollable_dropdown(
                         theme_options,
                         |cx| app_settings::get(cx).theme_name.clone().into(),
                         patch_theme_name,
                     ),
                 )
-                .description(
-                    "Drop gpui-component theme JSON files into the themes folder to add \
-                     your own.",
-                ),
+                .description(t!("settings.theme_desc").to_string()),
+                SettingItem::new(
+                    t!("settings.language"),
+                    SettingField::dropdown(
+                        language_options,
+                        |cx| app_settings::get(cx).language.clone().into(),
+                        patch_language,
+                    ),
+                )
+                .description(t!("settings.language_desc").to_string()),
                 stacked_item(
-                    "Themes folder",
+                    t!("settings.themes_folder"),
                     SettingField::render(|_, _, _| {
                         div()
                             .flex()
@@ -642,7 +680,7 @@ impl Render for SettingsView {
                             .child(
                                 Button::new("open-themes-folder")
                                     .icon(Icon::new(IconName::FolderOpen))
-                                    .label("Open Themes Folder")
+                                    .label(t!("settings.open_themes_folder"))
                                     .on_click(|_, _, _| {
                                         open_in_file_manager(&crate::theme::themes_dir())
                                     }),
@@ -650,7 +688,7 @@ impl Render for SettingsView {
                             .child(
                                 Button::new("browse-themes")
                                     .icon(Icon::new(IconName::ExternalLink))
-                                    .label("Browse Themes")
+                                    .label(t!("settings.browse_themes"))
                                     .on_click(|_, _, cx| {
                                         cx.open_url(
                                             "https://github.com/longbridge/gpui-component/tree/main/themes",
@@ -659,46 +697,43 @@ impl Render for SettingsView {
                             )
                     }),
                 )
-                .description(
-                    "Bundled Starlight themes are rewritten on every launch, copy one to a \
-                     new file before editing it.",
-                ),
+                .description(t!("settings.themes_folder_desc").to_string()),
                 SettingItem::new(
-                    "Floating stars background",
+                    t!("settings.stars_background"),
                     SettingField::switch(
                         |cx| app_settings::get(cx).show_stars_background,
                         patch_show_stars_background,
                     ),
                 )
-                .description("Show the slowly drifting starfield behind pages."),
+                .description(t!("settings.stars_background_desc").to_string()),
             ]));
 
-        let bepinex_page = SettingPage::new("BepInEx").groups(vec![
-            SettingGroup::new().title("Cache").items(vec![
+        let bepinex_page = SettingPage::new(t!("settings.page.bepinex")).groups(vec![
+            SettingGroup::new().title(t!("settings.group.cache")).items(vec![
                 SettingItem::new(
-                    "Cache BepInEx downloads",
+                    t!("settings.cache_downloads"),
                     SettingField::switch(
                         |cx| app_settings::get(cx).cache_bepinex,
                         patch_cache_bepinex,
                     ),
                 )
-                .description("Reuse cached archives across profile installs."),
-                cache_item("x64", "x64 cache"),
-                cache_item("x86", "x86 cache"),
+                .description(t!("settings.cache_downloads_desc").to_string()),
+                cache_item("x64", t!("settings.cache.x64").into()),
+                cache_item("x86", t!("settings.cache.x86").into()),
             ]),
             SettingGroup::new()
-                .title("Download URLs")
-                .description("Override the default release archive locations.")
+                .title(t!("settings.group.download_urls"))
+                .description(t!("settings.download_urls_desc"))
                 .items(vec![
                     stacked_item(
-                        "BepInEx x64 URL",
+                        t!("settings.bepinex_x64_url"),
                         SettingField::input(
                             |cx| app_settings::get(cx).bepinex_url_x64.clone().into(),
                             patch_bepinex_url_x64,
                         ),
                     ),
                     stacked_item(
-                        "BepInEx x86 URL",
+                        t!("settings.bepinex_x86_url"),
                         SettingField::input(
                             |cx| app_settings::get(cx).bepinex_url_x86.clone().into(),
                             patch_bepinex_url_x86,
@@ -712,18 +747,18 @@ impl Render for SettingsView {
             let kind = app_settings::get(cx).linux_runner_kind.clone();
 
             let auto_detect = SettingItem::new(
-                "Auto-detect",
+                t!("settings.auto_detect"),
                 SettingField::render(|_, _, _| {
                     Button::new("detect-linux-runtime")
                         .icon(Icon::new(AppIcon::Compass))
-                        .label("Auto-detect Linux runtime")
+                        .label(t!("settings.linux.auto_detect"))
                         .on_click(|_, window, cx| detect_linux_runtime(window, cx))
                 }),
             )
-            .description("Probe Steam/Proton + Wine prefixes from the Among Us path.");
+            .description(t!("settings.linux.auto_detect_desc"));
 
             let runner = SettingItem::new(
-                "Runner",
+                t!("settings.linux.runner"),
                 SettingField::dropdown(
                     vec![
                         ("steam".into(), "Steam".into()),
@@ -738,14 +773,10 @@ impl Render for SettingsView {
                     patch_linux_runner_kind,
                 ),
             )
-            .description(
-                "Steam launches via the Steam client (Steam must be running). For \
-                 modded launches, set the game's Steam launch options to \
-                 WINEDLLOVERRIDES=\"winhttp=n,b\" %command%.",
-            );
+            .description(t!("settings.linux.runner_desc"));
 
             let runner_binary = stacked_item(
-                "Runner binary",
+                t!("settings.linux.runner_binary"),
                 path_field(
                     "linux-runner-binary",
                     false,
@@ -755,7 +786,7 @@ impl Render for SettingsView {
             );
 
             let wine_prefix = stacked_item(
-                "Wine prefix",
+                t!("settings.linux.wine_prefix"),
                 path_field(
                     "linux-wine-prefix",
                     true,
@@ -765,7 +796,7 @@ impl Render for SettingsView {
             );
 
             let wine_region_info = stacked_item(
-                "RegionInfo.json path",
+                t!("settings.linux.region_info_path"),
                 path_field(
                     "linux-wine-region-info",
                     false,
@@ -778,14 +809,10 @@ impl Render for SettingsView {
                     patch_linux_wine_region_info_path,
                 ),
             )
-            .description(
-                "Among Us' RegionInfo.json inside the Wine prefix, used for server \
-                 management. Leave empty to derive it from the Wine prefix \
-                 (drive_c/users/<your user>/AppData/LocalLow/Innersloth/Among Us).",
-            );
+            .description(t!("settings.linux.region_info_desc"));
 
             let proton_compat = stacked_item(
-                "Proton compat data path",
+                t!("settings.linux.proton_compat"),
                 path_field(
                     "linux-proton-compat",
                     true,
@@ -798,22 +825,16 @@ impl Render for SettingsView {
                     patch_linux_proton_compat_data_path,
                 ),
             )
-            .description(
-                "The game's Steam compatdata folder (steamapps/compatdata/945360). \
-                 Also used to locate RegionInfo.json for server management.",
-            );
+            .description(t!("settings.linux.proton_compat_desc"));
 
             let steam_run = SettingItem::new(
-                "Wrap Proton in steam-run",
+                t!("settings.linux.steam_run"),
                 SettingField::switch(
                     |cx| app_settings::get(cx).linux_proton_use_steam_run,
                     patch_linux_proton_use_steam_run,
                 ),
             )
-            .description(
-                "Launch Proton via steam-run (NixOS/non-FHS systems). \
-                 Disable to run the Proton binary directly.",
-            );
+            .description(t!("settings.linux.steam_run_desc"));
 
             // Only show the fields the selected runner actually uses.
             let items = match kind {
@@ -832,16 +853,16 @@ impl Render for SettingsView {
                 }
             };
 
-            SettingPage::new("Linux runtime").group(
+            SettingPage::new(t!("settings.page.linux")).group(
                 SettingGroup::new()
-                    .title("Runner")
-                    .description("Used when launching the game on Linux.")
+                    .title(t!("settings.group.runner"))
+                    .description(t!("settings.group.runner_desc"))
                     .items(items),
             )
         };
 
         let about_page =
-            SettingPage::new("About").group(SettingGroup::new().items(vec![SettingItem::render(
+            SettingPage::new(t!("settings.page.about")).group(SettingGroup::new().items(vec![SettingItem::render(
                 |_, _window, cx| {
                     let theme = cx.global::<crate::theme::Theme>().clone();
                     div()
@@ -884,7 +905,7 @@ impl Render for SettingsView {
                                         .id("about-license-link")
                                         .cursor_pointer()
                                         .hover(|s| s.text_color(theme.text))
-                                        .child("GNU GPLv3 License")
+                                        .child(t!("settings.license"))
                                         .on_click(|_, _, cx| {
                                             cx.open_url("https://www.gnu.org/licenses/gpl-3.0.html")
                                         }),
@@ -897,7 +918,7 @@ impl Render for SettingsView {
                                 .child(
                                     Button::new("about-view-source")
                                         .icon(Icon::new(IconName::ExternalLink))
-                                        .label("View Source")
+                                        .label(t!("settings.view_source"))
                                         .on_click(|_, _, cx| {
                                             cx.open_url(
                                                 "https://github.com/All-Of-Us-Mods/Starlight-PC",
@@ -907,7 +928,7 @@ impl Render for SettingsView {
                                 .child(
                                     Button::new("about-open-data")
                                         .icon(Icon::new(IconName::FolderOpen))
-                                        .label("Open Data Folder")
+                                        .label(t!("settings.open_data_folder"))
                                         .on_click(|_, _, _| open_data_folder()),
                                 ),
                         )
@@ -921,7 +942,7 @@ impl Render for SettingsView {
                 div()
                     .text_2xl()
                     .font_weight(FontWeight::BOLD)
-                    .child("Settings"),
+                    .child(t!("nav.settings")),
             )
             .child(
                 Settings::new("starlight-settings")
