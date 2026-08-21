@@ -1,5 +1,6 @@
 use chrono::{DateTime, Local};
 use gpui::*;
+use rust_i18n::t;
 use gpui_component::separator::Separator;
 use gpui_component::text::TextView;
 
@@ -25,7 +26,7 @@ impl NewsDetailView {
 fn format_date(timestamp_ms: i64) -> String {
     DateTime::from_timestamp_millis(timestamp_ms)
         .map(|date| date.with_timezone(&Local).format("%B %-d, %Y").to_string())
-        .unwrap_or_else(|| "Unknown date".to_string())
+        .unwrap_or_else(|| t!("news.unknown_date").to_string())
 }
 
 impl Render for NewsDetailView {
@@ -60,10 +61,10 @@ impl Render for NewsDetailView {
                         div()
                             .text_sm()
                             .text_color(theme.text_muted)
-                            .child(format!("Posted by {}", self.post.author)),
+                            .child(t!("news.posted_by", author = self.post.author).to_string()),
                     )
                     .child(Separator::horizontal())
-                    .child(section_label("Content", &theme))
+                    .child(section_label(t!("news.content").to_string(), &theme))
                     .child(
                         div()
                             .text_sm()

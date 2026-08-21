@@ -1,4 +1,5 @@
 use gpui::*;
+use rust_i18n::t;
 
 use crate::backend::api::{self, ModResponse, Post};
 use crate::theme::ThemeExt;
@@ -81,13 +82,13 @@ fn failed_row(id: &'static str, message: &str, cx: &mut Context<HomeView>) -> An
         .child(Alert::error(id, message.to_string()).flex_1())
         .child(
             Button::new(SharedString::from(format!("{id}-button")))
-                .label("Retry")
+                .label(t!("common.retry"))
                 .on_click(cx.listener(|this, _, _window, cx| this.fetch(cx))),
         )
         .into_any_element()
 }
 
-fn section_title(text: &'static str) -> impl IntoElement {
+fn section_title(text: gpui::SharedString) -> impl IntoElement {
     div()
         .text_lg()
         .font_weight(FontWeight::SEMIBOLD)
@@ -152,7 +153,7 @@ fn news_card(post: &Post, theme: &crate::theme::Theme, cx: &mut Context<HomeView
             div()
                 .text_xs()
                 .text_color(theme.text_muted)
-                .child(format!("by {}", post.author)),
+                .child(t!("home.by_author", author = post.author).to_string()),
         )
         .child(
             div()
@@ -221,19 +222,19 @@ impl Render for HomeView {
         crate::views::page_root("home-page", &theme)
             .overflow_y_scroll()
             .gap_8()
-            .child(div().text_2xl().font_weight(FontWeight::BOLD).child("Home"))
+            .child(div().text_2xl().font_weight(FontWeight::BOLD).child(t!("nav.home")))
             .child(
                 div()
                     .flex()
                     .flex_col()
-                    .child(section_title("News"))
+                    .child(section_title(t!("home.news").into()))
                     .child(news_body),
             )
             .child(
                 div()
                     .flex()
                     .flex_col()
-                    .child(section_title("Trending Mods"))
+                    .child(section_title(t!("home.trending").into()))
                     .child(trending_body),
             )
     }

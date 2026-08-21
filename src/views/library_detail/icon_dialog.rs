@@ -3,6 +3,7 @@
 //! window's dialog layer while `icon_dialog` is `Some`.
 
 use gpui::*;
+use rust_i18n::t;
 use gpui_component::alert::Alert;
 use gpui_component::avatar::Avatar;
 use gpui_component::button::{Button, ButtonVariants};
@@ -64,18 +65,18 @@ impl LibraryDetailView {
             let on_ok = view.clone();
             let on_close = view.clone();
             dialog
-                .title("Edit Profile Icon")
+                .title(t!("icon.title"))
                 .w(px(480.0))
                 .child(body)
                 .footer(
                     DialogFooter::new()
                         .child(
                             DialogClose::new()
-                                .child(Button::new("icon-dialog-cancel").label("Cancel")),
+                                .child(Button::new("icon-dialog-cancel").label(t!("common.cancel"))),
                         )
                         .child(
                             DialogAction::new()
-                                .child(Button::new("icon-dialog-save").primary().label("Save")),
+                                .child(Button::new("icon-dialog-save").primary().label(t!("common.save"))),
                         ),
                 )
                 // Saving is asynchronous (and can fail validation), so the
@@ -117,7 +118,7 @@ impl LibraryDetailView {
             files: true,
             directories: false,
             multiple: false,
-            prompt: Some("Choose icon image".into()),
+            prompt: Some(t!("icon.choose_image_prompt").to_string().into()),
         });
         cx.spawn(async move |this, cx| {
             let Ok(Ok(Some(paths))) = receiver.await else {
@@ -142,8 +143,8 @@ impl LibraryDetailView {
                             state.pending_custom = Some((bytes, extension));
                             state.error = None;
                         }
-                        Ok(_) => state.error = Some("Selected image is empty".into()),
-                        Err(e) => state.error = Some(format!("Failed to read image: {e}")),
+                        Ok(_) => state.error = Some(t!("icon.image_empty").to_string()),
+                        Err(e) => state.error = Some(t!("icon.image_read_failed", error = e).to_string()),
                     }
                     cx.notify();
                 }
@@ -176,7 +177,7 @@ impl LibraryDetailView {
                     }
                     None => {
                         if let Some(s) = self.icon_dialog.as_mut() {
-                            s.error = Some("Choose an image for the custom icon".into());
+                            s.error = Some(t!("icon.choose_custom").to_string());
                         }
                         cx.notify();
                         return;
@@ -186,7 +187,7 @@ impl LibraryDetailView {
             IconDialogMode::Mod => {
                 let Some(mod_id) = state.selected_mod_id.clone() else {
                     if let Some(s) = self.icon_dialog.as_mut() {
-                        s.error = Some("Select an installed mod icon".into());
+                        s.error = Some(t!("icon.select_mod").to_string());
                     }
                     cx.notify();
                     return;
@@ -209,7 +210,7 @@ impl LibraryDetailView {
                 }
                 Err(e) => {
                     if let Some(s) = this.icon_dialog.as_mut() {
-                        s.error = Some(format!("Failed to update icon: {e}"));
+                        s.error = Some(t!("icon.update_failed", error = e).to_string());
                     }
                     cx.notify();
                 }
@@ -244,9 +245,9 @@ fn icon_dialog_body(view: &Entity<LibraryDetailView>, cx: &App) -> AnyElement {
     let mode_tabs = TabBar::new("icon-mode-tabs")
         .segmented()
         .selected_index(MODES.iter().position(|m| *m == mode).unwrap_or(0))
-        .child("Default")
-        .child("Custom Image")
-        .child("Installed Mod")
+        .child(t!("icon.tab_default").to_string())
+        .child(t!("icon.tab_custom").to_string())
+        .child(t!("icon.tab_mod").to_string())
         .on_click(move |ix: &usize, _window, cx| {
             let Some(target) = MODES.get(*ix).copied() else {
                 return;
@@ -258,7 +259,7 @@ fn icon_dialog_body(view: &Entity<LibraryDetailView>, cx: &App) -> AnyElement {
         IconDialogMode::Default => div()
             .text_sm()
             .text_color(theme.text_muted)
-            .child("Use the default profile icon.")
+            .child(t!("icon.default_desc").to_string())
             .into_any_element(),
         IconDialogMode::Custom => {
             let has_pending = state.pending_custom.is_some();
@@ -267,19 +268,19 @@ fn icon_dialog_body(view: &Entity<LibraryDetailView>, cx: &App) -> AnyElement {
             let status: AnyElement = if has_pending {
                 div()
                     .text_sm()
-                    .child("New image ready to save.")
+                    .child(t!("icon.image_ready").to_string())
                     .into_any_element()
             } else if has_existing {
                 div()
                     .text_sm()
                     .text_color(theme.text_muted)
-                    .child("Using existing custom image. Choose a new one to replace it.")
+                    .child(t!("icon.using_existing").to_string())
                     .into_any_element()
             } else {
                 div()
                     .text_sm()
                     .text_color(theme.text_muted)
-                    .child("PNG, JPG, WEBP, GIF, BMP, or AVIF.")
+                    .child(t!("icon.formats").to_string())
                     .into_any_element()
             };
             let on_pick = view.clone();
@@ -291,9 +292,9 @@ fn icon_dialog_body(view: &Entity<LibraryDetailView>, cx: &App) -> AnyElement {
                     Button::new("icon-pick-file")
                         .icon(Icon::new(IconName::FolderOpen))
                         .label(if has_pending || has_existing {
-                            "Change Image"
+                            t!("icon.change_image")
                         } else {
-                            "Choose Image"
+                            t!("icon.choose_image")
                         })
                         .on_click(move |_, window, cx| {
                             on_pick.update(cx, |this, cx| this.pick_custom_icon(window, cx));
@@ -316,7 +317,7 @@ fn icon_dialog_body(view: &Entity<LibraryDetailView>, cx: &App) -> AnyElement {
                 div()
                     .text_sm()
                     .text_color(theme.text_muted)
-                    .child("No mods installed. Add a mod to use its icon.")
+                    .child(t!("icon.no_mods").to_string())
                     .into_any_element()
             } else {
                 let selected = state.selected_mod_id.clone();

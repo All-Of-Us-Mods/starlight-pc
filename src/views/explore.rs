@@ -1,4 +1,5 @@
 use gpui::*;
+use rust_i18n::t;
 
 use crate::backend::api::{self, ModResponse};
 use crate::theme::ThemeExt;
@@ -34,11 +35,11 @@ enum SortBy {
 }
 
 impl SortBy {
-    fn label(self) -> &'static str {
+    fn label(self) -> gpui::SharedString {
         match self {
-            SortBy::Downloads => "Downloads",
-            SortBy::Updated => "Recently Updated",
-            SortBy::Created => "Newest",
+            SortBy::Downloads => t!("explore.sort.downloads").into(),
+            SortBy::Updated => t!("explore.sort.updated").into(),
+            SortBy::Created => t!("explore.sort.newest").into(),
         }
     }
 
@@ -60,12 +61,12 @@ enum TypeFilter {
 }
 
 impl TypeFilter {
-    fn label(self) -> &'static str {
+    fn label(self) -> gpui::SharedString {
         match self {
-            TypeFilter::All => "All",
-            TypeFilter::AllClients => "All Clients",
-            TypeFilter::ClientOnly => "Client Only",
-            TypeFilter::HostOnly => "Host Only",
+            TypeFilter::All => t!("explore.type.all").into(),
+            TypeFilter::AllClients => t!("explore.type.all_clients").into(),
+            TypeFilter::ClientOnly => t!("explore.type.client_only").into(),
+            TypeFilter::HostOnly => t!("explore.type.host_only").into(),
         }
     }
 
@@ -110,7 +111,8 @@ enum LoadState {
 
 impl ExploreView {
     pub fn new(window: &mut Window, cx: &mut Context<Self>) -> Self {
-        let search_input = cx.new(|cx| InputState::new(window, cx).placeholder("Search mods..."));
+        let search_input =
+            cx.new(|cx| InputState::new(window, cx).placeholder(t!("explore.search").to_string()));
         cx.subscribe_in(
             &search_input,
             window,
@@ -284,11 +286,11 @@ impl Render for ExploreView {
                 .gap_3()
                 .child(Alert::error(
                     "explore-load-failed",
-                    format!("Failed to load mods: {e}"),
+                    t!("explore.load_failed", error = e).to_string(),
                 ))
                 .child(
                     Button::new("explore-retry")
-                        .label("Retry")
+                        .label(t!("common.retry"))
                         .on_click(cx.listener(|this, _, _window, cx| {
                             this.state = LoadState::Loading;
                             cx.notify();
@@ -310,7 +312,7 @@ impl Render for ExploreView {
                         .items_center()
                         .justify_center()
                         .text_color(theme.text_muted)
-                        .child("No mods found.")
+                        .child(t!("explore.no_mods").to_string())
                         .into_any_element()
                 } else {
                     sorted.sort_by_key(|m| std::cmp::Reverse(self.sort.key(m)));
@@ -370,7 +372,7 @@ impl Render for ExploreView {
             .items_center()
             .gap_3()
             .flex_none()
-            .child(div().text_sm().text_color(theme.text_muted).child("Type"))
+            .child(div().text_sm().text_color(theme.text_muted).child(t!("explore.type_label")))
             .child(self.type_pill("type-all", TypeFilter::All, cx))
             .child(self.type_pill("type-all-clients", TypeFilter::AllClients, cx))
             .child(self.type_pill("type-client-only", TypeFilter::ClientOnly, cx))
@@ -384,7 +386,7 @@ impl Render for ExploreView {
                     .flex_none()
                     .text_2xl()
                     .font_weight(FontWeight::BOLD)
-                    .child("Explore"),
+                    .child(t!("nav.explore")),
             )
             .child(controls)
             .child(type_row)

@@ -1,0 +1,320 @@
+# Structure mirrors app.en.yml 1:1. Translate the value on each line; if you
+# leave a line in English or delete it, that string falls back to English at
+# runtime, so partial translations are fine. Keep %{placeholders} intact.
+# Component-internal strings (gpui-component) can optionally go into a
+# locales/ui.nl.yml file under a top-level "gpui_component:" namespace.
+nav:
+  home: Home
+  explore: Ontdekken
+  library: Bibliotheek
+  servers: Servers
+  lobbies: Lobby's
+  settings: Instellingen
+common:
+  cancel: Annuleren
+  save: Opslaan
+  delete: Verwijderen
+  close: Sluiten
+  stop: Stoppen
+  clear: Wissen
+  retry: Opnieuw proberen
+  unknown: Onbekend
+  never: Nooit
+  failed: "Mislukt: %{error}"
+time:
+  hours_minutes: "%{hours}u %{minutes}m"
+  minutes: "%{minutes} min"
+  less_than_minute: "< 1 min"
+home:
+  news: Nieuws
+  trending: Populaire mods
+  by_author: "door %{author}"
+news:
+  unknown_date: Onbekende datum
+  posted_by: "Geplaatst door %{author}"
+  content: Inhoud
+explore:
+  search: Mods zoeken...
+  load_failed: "Mods laden mislukt: %{error}"
+  no_mods: Geen mods gevonden.
+  type_label: Type
+  sort:
+    downloads: Downloads
+    updated: Recent bijgewerkt
+    newest: Nieuwste
+  type:
+    all: Alles
+    all_clients: Alle clients
+    client_only: Alleen client
+    host_only: Alleen host
+library:
+  profile_name: Profielnaam
+  new_profile: Nieuw profiel
+  create: Aanmaken
+  create_profile: Profiel aanmaken
+  import: Importeren
+  import_profile: Profiel importeren
+  import_failed: "Importeren mislukt: %{error}"
+  importing: "Importeren… %{percent}%"
+  add_mod_failed: "Mod toevoegen mislukt: %{error}"
+  unsupported_drop: Sleep een mod .dll of een geëxporteerd profiel .zip bestand hierheen
+  drop_dll_on_profile: Sleep een mod .dll naar een profiel om deze te installeren
+  vanilla_failed: "Vanilla starten mislukt: %{error}"
+  launch_vanilla: Vanilla starten
+  stop_all: "Alles stoppen (%{count})"
+  load_failed: "Profielen laden mislukt: %{error}"
+  empty: Nog geen profielen. Klik op "Profiel aanmaken" om er een te maken, of sleep hier een geëxporteerd profiel .zip bestand naartoe.
+  setup_banner: Het pad naar Among Us is niet ingesteld — profielen kunnen nog niet worden gestart.
+  open_settings: Instellingen openen
+  card_stats: "%{mods} mods · %{played} gespeeld"
+  last_launched: "Laatst gestart %{when}"
+mod:
+  fallback_title: Mod
+  new_profile_name: Nieuwe profielnaam
+  empty_profile_name: Profielnaam mag niet leeg zijn
+  pick_profile: Kies eerst een profiel
+  installing_bepinex_mods: BepInEx + mods installeren…
+  installing_mods: Mods installeren…
+  bepinex_progress: "BepInEx: %{message}"
+  install_version: "v%{version} installeren"
+  downloads: "%{count} downloads"
+  updated: "Bijgewerkt op %{date}"
+  type_label: "Type: %{kind}"
+  about: Over
+  changelog: Wijzigingslog
+  links: Links
+  licensed_under: "Gelicenseerd onder %{license}"
+  resolving: Afhankelijkheden oplossen…
+  installed: Geïnstalleerd.
+  new_profile_chip: + Nieuw profiel
+  created_on_install: Aangemaakt tijdens installatie, met het pictogram van deze mod
+  optional: " (optioneel)"
+  dep_label: "%{name} v%{version}%{optional}"
+  dep_detail: "%{id} — vereiste %{constraint}"
+  dep_already_installed: "%{detail} — al geïnstalleerd"
+  unresolved: "%{count} afhankelijkheden konden niet worden opgelost en worden overgeslagen: %{list}"
+  install_into: Installeren in profiel
+  version: Versie
+  dependencies: Afhankelijkheden
+  install: Installeren
+lobbies:
+  dialog_title: "Starten in lobby %{code}"
+  launching: Starten…
+  launch: Starten
+  code_copied: "Code %{code} naar het klembord gekopieerd. "
+  code_copied_notice: Code naar het klembord gekopieerd.
+  copy_code: Lobbycode kopiëren
+  regions_unavailable: "%{reason} Voeg een regio toe op het tabblad Servers om de lobby's ervan te bekijken."
+  regions_unavailable_title: Je Among Us-regio's konden niet worden gelezen
+  empty: Geen open lobby's gevonden. Alleen servers die een openbare lobbylijst publiceren worden hier weergegeven.
+  unknown_host: Onbekende host
+  modded_profile: Gemod profiel
+  bepinex_will_install: BepInEx wordt geïnstalleerd
+  temporary_profile: Tijdelijk profiel
+  temporary_profile_subtitle: Nieuw profiel dat automatisch wordt verwijderd zodra het spel wordt gesloten
+  region: "Regio: %{region}"
+  profile: Profiel
+  no_mods_required: Geen mods vereist.
+  required_mods: Vereiste mods
+  refreshing: Vernieuwen…
+  description: Open spellen in je ingeschakelde regio's die een openbare lobbylijst publiceren. Start het spel en plak daarna de gekopieerde code in-game.
+  active: Actieve lobby's
+  all_installed: Alle vereiste mods zijn al geïnstalleerd
+  will_install: "Wordt geïnstalleerd: %{names}"
+  more: ", +%{count} meer"
+  checking: "%{count} mod(s) controleren…"
+  not_in_catalog: "%{count} niet in de catalogus (wordt overgeslagen)"
+  unknown_map: Onbekende map
+  unknown_mod: Onbekende mod
+  unknown_mod_version: "Onbekende mod %{version}"
+  profile_gone: Het geselecteerde profiel bestaat niet meer
+  profile_gone_launch: Het profiel is vóór het starten verdwenen
+  launched_region_set: Gestart met de regio ingesteld op deze lobby.
+  launched: Gestart.
+  skipped_catalog: " %{count} vereiste mod(s) stonden niet in de catalogus en zijn overgeslagen."
+  skipped_failed: " %{count} mod(s) konden niet worden geïnstalleerd en zijn overgeslagen."
+servers:
+  added: 'Regio "%{name}" toegevoegd'
+  already_added: '"%{name}" is al toegevoegd'
+  saved: 'Regio "%{name}" opgeslagen'
+  my_server: Mijn server
+  edit_title: Server bewerken
+  add_title: Aangepaste server toevoegen
+  name: Naam
+  address: Adres
+  port: Poort
+  use_dtls: DTLS gebruiken
+  add: Toevoegen
+  add_custom: Aangepaste toevoegen
+  name_address_required: Naam en adres zijn verplicht.
+  port_invalid: Poort moet een getal tussen 1 en 65535 zijn.
+  conflict: '"%{name}" verwijst al naar dat adres en die poort.'
+  address_exists: Er bestaat al een regio voor dat adres.
+  regioninfo_unreadable: regionInfo.json kon niet worden gelezen.
+  no_regions: Nog geen regio's ingesteld. Voeg er hieronder een toe.
+  edit_tooltip: Deze server bewerken
+  remove_tooltip: Deze server verwijderen
+  load_failed: "Servers laden mislukt: %{error}"
+  none_available: Geen servers beschikbaar.
+  all_added: Alle beschikbare servers zijn toegevoegd.
+  by_address: "door %{owner} · %{address}:%{port}"
+  description: Voeg communityservers toe als Among Us regio's. Start het spel opnieuw om de wijzigingen toe te passen.
+  installed_regions: Geïnstalleerde regio's
+  available: Beschikbare servers
+profile:
+  fallback_title: Profiel
+  this_profile: dit profiel
+  not_found: Profiel niet gevonden
+  bepinex_not_installed: BepInEx niet geïnstalleerd
+  bepinex_incompatible: Deze BepInEx-installatie is niet compatibel met %{platform}
+  install_bepinex: BepInEx installeren
+  instances_running: "%{count} instantie(s) actief"
+  launch_another: Nog een starten
+  open_folder: Map openen
+  export_zip: ZIP exporteren
+  desktop_shortcut: Bureaubladsnelkoppeling
+  exporting: "Exporteren… %{percent}%"
+  exported: "Profiel geëxporteerd naar %{dest}"
+  export_failed: "Exporteren mislukt: %{error}"
+  shortcut_created: "Snelkoppeling aangemaakt op %{path}"
+  shortcut_failed: "Snelkoppeling aanmaken mislukt: %{error}"
+  rename_title: Profiel hernoemen
+  rename_failed: "Hernoemen mislukt: %{error}"
+  delete_title: Profiel verwijderen
+  delete_desc: '"%{name}" verwijderen? De mods en logbestanden worden van de schijf verwijderd. Dit kan niet ongedaan worden gemaakt.'
+  delete_failed: "Verwijderen mislukt: %{error}"
+  delete_profile: Profiel verwijderen
+  delete_this_profile: Dit profiel verwijderen
+  delete_this_profile_desc: Verwijdert het profiel, de mods en logbestanden van de schijf. Dit kan niet ongedaan worden gemaakt.
+  danger_zone: Gevarenzone
+  remove_mod_title: Mod verwijderen
+  remove_mod_desc: '"%{name}" uit dit profiel verwijderen? De bestanden worden van de schijf verwijderd.'
+  remove: Verwijderen
+  remove_mod_failed: "Mod verwijderen mislukt: %{error}"
+  toggle_failed: "Wijzigen mislukt: %{error}"
+  add_dll_prompt: BepInEx-plugin (.dll) toevoegen
+  drop_dll: Sleep een mod-.dll hierheen om deze aan dit profiel toe te voegen
+  drop_zip: Importeer profiel-.zipbestanden vanaf de Bibliotheekpagina
+  added: "%{names} toegevoegd"
+  custom_mod: Aangepast
+  no_mods: Geen mods geïnstalleerd. Installeer ze via Ontdekken, of sleep hier een BepInEx-plugin-.dll naartoe.
+  mods_heading: "Mods · %{count}"
+  install_mods: Mods installeren
+  add_dll: DLL toevoegen
+icon:
+  title: Profielpictogram bewerken
+  choose_image_prompt: Pictogramafbeelding kiezen
+  image_empty: De geselecteerde afbeelding is leeg
+  image_read_failed: "Afbeelding lezen mislukt: %{error}"
+  choose_custom: Kies een afbeelding voor het aangepaste pictogram
+  select_mod: Selecteer het pictogram van een geïnstalleerde mod
+  update_failed: "Pictogram bijwerken mislukt: %{error}"
+  tab_default: Standaard
+  tab_custom: Aangepaste afbeelding
+  tab_mod: Geïnstalleerde mod
+  default_desc: Gebruik het standaard profielpictogram.
+  image_ready: Nieuwe afbeelding klaar om op te slaan.
+  using_existing: Bestaande aangepaste afbeelding wordt gebruikt. Kies een nieuwe om deze te vervangen.
+  formats: PNG, JPG, WEBP, GIF, BMP of AVIF.
+  change_image: Afbeelding wijzigen
+  choose_image: Afbeelding kiezen
+  no_mods: Geen mods geïnstalleerd. Voeg een mod toe om het pictogram ervan te gebruiken.
+notify:
+  among_us_detected: "Among Us gevonden op %{path}"
+  among_us_not_found: "Among Us kon niet automatisch worden gevonden — stel de map in via Instellingen → Spel voordat je start."
+migrate:
+  offer: "%{count} profiel/profielen van de vorige Starlight-versie gevonden. Migreren naar deze installatie?"
+  title: Profielen migreren
+  action: Migreren
+  done: "%{count} profiel/profielen gemigreerd"
+  failed: "Migratie mislukt: %{error}"
+titlebar:
+  stop_count: "Stoppen (%{count})"
+  launch: "%{name} starten"
+  launch_failed: "Starten mislukt: %{error}"
+  stop_failed: "Stoppen mislukt: %{error}"
+update:
+  available: "Starlight %{version} is beschikbaar."
+  title: Update beschikbaar
+  restart: Herstarten en bijwerken
+  failed: "Bijwerken mislukt: %{error}"
+settings:
+  page:
+    game: Spel
+    launch: Starten
+    appearance: Weergave
+    bepinex: BepInEx
+    linux: Linux-runtime
+    about: Over
+  group:
+    installation: Installatie
+    platform: Platform
+    behavior: Gedrag
+    theme: Thema
+    cache: Cache
+    download_urls: Download-URL's
+    runner: Runner
+    runner_desc: 'Steam start via de Steam-client (Steam moet actief zijn). Stel voor gemodde launches de Steam-startopties van het spel in op WINEDLLOVERRIDES="winhttp=n,b" %command%.'
+  among_us_path: Among Us-pad
+  among_us_path_desc: Map die Among Us.exe bevat.
+  auto_detect: Automatisch detecteren
+  auto_detect_among_us: Among Us automatisch detecteren
+  auto_detect_desc: Zoek bekende installatielocaties en stel het bovenstaande pad in.
+  game_platform: Spelplatform
+  game_platform_desc: Via welke winkel het spel is geïnstalleerd.
+  close_on_launch: Starlight sluiten bij het starten
+  close_on_launch_desc: Sluit de app nadat het spel is gestart.
+  multi_instance: Meerdere instanties toestaan
+  multi_instance_desc: "Sta toe dat meerdere spelvensters tegelijk worden gestart. Extra instanties worden uitgevoerd vanuit een tijdelijke kopie van het profiel, zodat ze direct kunnen starten zonder conflicten met BepInEx-bestanden."
+  theme: Thema
+  theme_desc: Plaats gpui-component-thema-JSON-bestanden in de themamap om je eigen thema's toe te voegen.
+  language: Taal
+  language_desc: UI-taal voor Starlight en de bijbehorende onderdelen.
+  themes_folder: Themamap
+  open_themes_folder: Themamap openen
+  browse_themes: Thema's bekijken
+  themes_folder_desc: Meegeleverde Starlight-thema's worden bij elke start opnieuw geschreven. Kopieer een thema naar een nieuw bestand voordat je het bewerkt.
+  stars_background: Zwevende sterrenachtergrond
+  stars_background_desc: Toon het langzaam bewegende sterrenveld achter de pagina's.
+  cache_downloads: BepInEx-downloads cachen
+  cache_downloads_desc: Hergebruik gecachte archieven voor meerdere profielinstallaties.
+  cache:
+    x64: x64-cache
+    x86: x86-cache
+    cached: "Gecacht · %{size}"
+    not_cached: Niet gecacht
+    path_unavailable: Cachepad niet beschikbaar
+    download: Downloaden
+    downloaded: "BepInEx %{arch} gedownload"
+    download_failed: "Downloaden van BepInEx %{arch} mislukt: %{error}"
+    cleared: "BepInEx %{arch}-cache gewist"
+    clear_failed: "Wissen mislukt: %{error}"
+    path_error: "Cachepad: %{error}"
+  bepinex_x64_url: BepInEx x64-URL
+  bepinex_x86_url: BepInEx x86-URL
+  download_urls_desc: Overschrijf de standaardlocaties van release-archieven.
+  detected: "Among Us gevonden op %{path}"
+  detected_store: "Among Us (%{store}) gevonden op %{path}"
+  not_detected: Among Us-installatie kon niet automatisch worden gevonden
+  detection_failed: "Detectie mislukt: %{error}"
+  linux:
+    detected: Linux-runtime gevonden
+    auto_detect: Linux-runtime automatisch detecteren
+    auto_detect_desc: Zoek naar Steam/Proton- en Wine-prefixes op basis van het Among Us-pad.
+    runner: Runner
+    runner_desc: 'Steam start via de Steam-client (Steam moet actief zijn). Stel voor gemodde launches de Steam-startopties van het spel in op WINEDLLOVERRIDES="winhttp=n,b" %command%.'
+    runner_binary: Runner-binary
+    wine_prefix: Wine-prefix
+    region_info_path: Pad naar RegionInfo.json
+    region_info_desc: "Among Us' RegionInfo.json binnen de Wine-prefix, gebruikt voor serverbeheer. Laat leeg om het pad af te leiden van de Wine-prefix (drive_c/users/<your user>/AppData/LocalLow/Innersloth/Among Us)."
+    proton_compat: Pad naar Proton-compatdata
+    proton_compat_desc: De Steam-compatdatamap van het spel (steamapps/compatdata/945360). Wordt ook gebruikt om RegionInfo.json voor serverbeheer te vinden.
+    steam_run: Proton via steam-run uitvoeren
+    steam_run_desc: Start Proton via steam-run (NixOS/non-FHS-systemen). Schakel dit uit om de Proton-binary rechtstreeks uit te voeren.
+  license: GNU GPLv3-licentie
+  view_source: Broncode bekijken
+  open_data_folder: Gegevensmap openen
+  path:
+    select_folder: Map selecteren
+    select_file: Bestand selecteren
+    browse: Bladeren

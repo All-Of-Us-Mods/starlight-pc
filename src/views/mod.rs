@@ -29,10 +29,10 @@ pub fn page_root(id: &'static str, theme: &Theme) -> Stateful<Div> {
 }
 
 /// Muted, small-caps heading used above content sections in detail views.
-pub fn section_label(text: &'static str, theme: &Theme) -> impl IntoElement {
+pub fn section_label(text: impl Into<SharedString>, theme: &Theme) -> impl IntoElement {
     div()
         .text_xs()
         .font_weight(FontWeight::SEMIBOLD)
         .text_color(theme.text_muted)
-        .child(text)
+        .child(text.into())
 }

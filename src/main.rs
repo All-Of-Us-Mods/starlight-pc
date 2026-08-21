@@ -4,6 +4,16 @@
 
 use gpui::*;
 
+// Registers the app's `locales/` directory as a translation backend (merged
+// with gpui-component's built-ins via `extend!` below). English is the source
+// of truth; other languages only need to supply the keys they translate.
+// Must sit above the `mod`s so the `t!` macro is visible in every module.
+//
+// Uses the v1 locale format (locale from the filename suffix, e.g.
+// `app.en.yml`): rust-i18n 4.2.1's `_version: 2` parser mis-parses keys
+// nested deeper than two segments, scattering them into bogus locales.
+rust_i18n::i18n!("locales", fallback = "en");
+
 mod app;
 mod backend;
 mod settings;
@@ -146,11 +156,15 @@ fn main() {
         .with_assets(ui::icon::EmbeddedAssets)
         .with_http_client(http)
         .run(move |cx: &mut App| {
+            // Merge our locale overrides into gpui-component's translations
+            // before any component renders. Must run exactly once.
+            rust_i18n::extend!(gpui_component);
             gpui_component::init(cx);
             gpui_component::Theme::change(gpui_component::ThemeMode::Dark, None, cx);
             ui::log_language::register();
-            // Settings first — the theme preset comes from them.
+            // Settings first — the theme preset and language come from them.
             settings::init(cx);
+            rust_i18n::set_locale(&settings::get(cx).language);
             theme::init(cx);
             backend::init(cx);
 
@@ -216,4 +230,25 @@ fn main() {
                 handle_deep_link_url(url);
             }
         });
+}
+
+#[cfg(test)]
+mod i18n_tests {
+    // Guards against regressions in locale loading: rust-i18n 4.2.1's v2
+    // parser silently mis-files keys nested deeper than two segments (see the
+    // note on `i18n!` above), which used to leave most strings untranslated.
+    #[test]
+    fn shallow_and_deep_keys_resolve() {
+        rust_i18n::set_locale("en");
+        assert_eq!(rust_i18n::t!("nav.home"), "Home");
+        assert_eq!(rust_i18n::t!("settings.page.appearance"), "Appearance");
+        assert_eq!(
+            rust_i18n::t!("profile.delete_desc", name = "X"),
+            "Delete \"X\"? Its mods and logs are removed from disk. This can't be undone."
+        );
+        assert_eq!(
+            rust_i18n::t!("titlebar.launch", name = "Foo"),
+            "Launch Foo"
+        );
+    }
 }

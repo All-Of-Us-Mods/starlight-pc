@@ -38,12 +38,9 @@ fn has_extension(path: &Path, extension: &str) -> bool {
         .is_some_and(|found| found.eq_ignore_ascii_case(extension))
 }
 
-/// Message for a drop that contained nothing we handle.
-pub const UNSUPPORTED_DROP: &str = "Drop a mod .dll or an exported profile .zip";
-
 #[cfg(test)]
 mod tests {
-    use super::{DroppedFiles, UNSUPPORTED_DROP};
+    use super::DroppedFiles;
     use std::path::PathBuf;
 
     #[test]
@@ -72,6 +69,5 @@ mod tests {
 
         assert!(dropped.is_empty());
         assert_eq!(dropped.rejected, 2);
-        assert!(!UNSUPPORTED_DROP.is_empty());
     }
 }

@@ -1,5 +1,6 @@
 use gpui::*;
 use log::warn;
+use rust_i18n::t;
 
 use crate::backend::api::{self, Server};
 use crate::backend::deeplink::ServerLink;
@@ -121,8 +122,12 @@ impl ServersView {
                 .await;
             let _ = this.update(cx, |this, cx| {
                 match result {
-                    Ok((name, true)) => this.notice = Some(format!("Added region \"{name}\"")),
-                    Ok((name, false)) => this.notice = Some(format!("\"{name}\" is already added")),
+                    Ok((name, true)) => {
+                        this.notice = Some(t!("servers.added", name = name).to_string())
+                    }
+                    Ok((name, false)) => {
+                        this.notice = Some(t!("servers.already_added", name = name).to_string())
+                    }
                     Err(e) => {
                         warn!("add region failed: {e}");
                         this.error = Some(e.to_string());
@@ -177,9 +182,11 @@ impl ServersView {
                 .await;
             let _ = this.update(cx, |this, cx| {
                 match result {
-                    Ok((name, true)) => this.notice = Some(format!("Added region \"{name}\"")),
+                    Ok((name, true)) => {
+                        this.notice = Some(t!("servers.added", name = name).to_string())
+                    }
                     Ok((name, false)) => {
-                        this.notice = Some(format!("\"{name}\" is already added"));
+                        this.notice = Some(t!("servers.already_added", name = name).to_string());
                     }
                     Err(e) => {
                         warn!("add region from deep link failed: {e}");
@@ -240,7 +247,7 @@ impl ServersView {
     ) {
         let name = cx.new(|cx| {
             InputState::new(window, cx)
-                .placeholder("My Server")
+                .placeholder(t!("servers.my_server").to_string())
                 .default_value(fields.name)
         });
         let address = cx.new(|cx| {
@@ -295,20 +302,20 @@ impl ServersView {
             let on_close = view.clone();
             dialog
                 .title(if editing {
-                    "Edit server"
+                    t!("servers.edit_title")
                 } else {
-                    "Add custom server"
+                    t!("servers.add_title")
                 })
                 .w(px(420.0))
                 .child(
                     v_form()
-                        .child(field().label("Name").child(Input::new(&name)))
-                        .child(field().label("Address").child(Input::new(&address)))
-                        .child(field().label("Port").child(Input::new(&port)))
+                        .child(field().label(t!("servers.name").to_string()).child(Input::new(&name)))
+                        .child(field().label(t!("servers.address").to_string()).child(Input::new(&address)))
+                        .child(field().label(t!("servers.port").to_string()).child(Input::new(&port)))
                         .child(
                             field().child(
                                 Checkbox::new("custom-dtls")
-                                    .label("Use DTLS")
+                                    .label(t!("servers.use_dtls").to_string())
                                     .checked(dtls)
                                     .on_click(move |checked: &bool, _window, cx| {
                                         let checked = *checked;
@@ -326,13 +333,14 @@ impl ServersView {
                 .footer(
                     DialogFooter::new()
                         .child(
-                            DialogClose::new().child(Button::new("custom-cancel").label("Cancel")),
+                            DialogClose::new()
+                                .child(Button::new("custom-cancel").label(t!("common.cancel"))),
                         )
                         .child(DialogAction::new().child(
                             Button::new("custom-save").primary().label(if editing {
-                                "Save"
+                                t!("common.save")
                             } else {
-                                "Add"
+                                t!("servers.add")
                             }),
                         )),
                 )
@@ -366,14 +374,14 @@ impl ServersView {
 
         if name.is_empty() || address.is_empty() {
             if let Some(d) = self.custom_dialog.as_mut() {
-                d.error = Some("Name and address are required.".into());
+                d.error = Some(t!("servers.name_address_required").to_string());
             }
             cx.notify();
             return;
         }
         let Ok(port) = port_text.parse::<u16>() else {
             if let Some(d) = self.custom_dialog.as_mut() {
-                d.error = Some("Port must be a number between 1 and 65535.".into());
+                d.error = Some(t!("servers.port_invalid").to_string());
             }
             cx.notify();
             return;
@@ -386,9 +394,7 @@ impl ServersView {
         });
         if let Some(other) = clash {
             if let Some(d) = self.custom_dialog.as_mut() {
-                d.error = Some(format!(
-                    "\"{other}\" already points at that address and port."
-                ));
+                d.error = Some(t!("servers.conflict", name = other).to_string());
             }
             cx.notify();
             return;
@@ -421,9 +427,11 @@ impl ServersView {
                 .await;
             let _ = this.update(cx, |this, cx| {
                 match result {
-                    Ok((name, true)) => this.notice = Some(format!("Added region \"{name}\"")),
+                    Ok((name, true)) => {
+                        this.notice = Some(t!("servers.added", name = name).to_string())
+                    }
                     Ok((_, false)) => {
-                        this.notice = Some("A region for that address already exists.".into())
+                        this.notice = Some(t!("servers.address_exists").to_string())
                     }
                     Err(e) => {
                         warn!("add custom region failed: {e}");
@@ -464,7 +472,9 @@ impl ServersView {
                 .await;
             let _ = this.update(cx, |this, cx| {
                 match result {
-                    Ok(name) => this.notice = Some(format!("Saved region \"{name}\"")),
+                    Ok(name) => {
+                        this.notice = Some(t!("servers.saved", name = name).to_string())
+                    }
                     Err(e) => {
                         warn!("update region failed: {e}");
                         this.error = Some(e.to_string());
@@ -493,7 +503,7 @@ impl ServersView {
                 .child(
                     self.regions_error
                         .clone()
-                        .unwrap_or_else(|| "Could not read regionInfo.json.".to_string()),
+                        .unwrap_or_else(|| t!("servers.regioninfo_unreadable").to_string()),
                 )
                 .into_any_element();
         };
@@ -502,7 +512,7 @@ impl ServersView {
             return div()
                 .text_sm()
                 .text_color(theme.text_muted)
-                .child("No regions configured yet. Add one below.")
+                .child(t!("servers.no_regions").to_string())
                 .into_any_element();
         }
 
@@ -551,7 +561,7 @@ impl ServersView {
                         .ghost()
                         .xsmall()
                         .icon(Icon::new(AppIcon::Pencil))
-                        .tooltip("Edit this server")
+                        .tooltip(t!("servers.edit_tooltip").to_string())
                         .on_click(cx.listener(move |this, _, window, cx| {
                             this.open_edit_dialog(ix, window, cx)
                         })),
@@ -562,7 +572,7 @@ impl ServersView {
                         .xsmall()
                         .danger()
                         .icon(Icon::new(IconName::Delete))
-                        .tooltip("Remove this server")
+                        .tooltip(t!("servers.remove_tooltip").to_string())
                         .on_click(cx.listener(move |this, _, _window, cx| {
                             this.remove_region(remove_name.clone(), cx)
                         })),
@@ -599,13 +609,13 @@ impl ServersView {
                 .child(
                     Alert::error(
                         "servers-load-failed",
-                        format!("Failed to load servers: {e}"),
+                        t!("servers.load_failed", error = e).to_string(),
                     )
                     .flex_1(),
                 )
                 .child(
                     Button::new("servers-retry")
-                        .label("Retry")
+                        .label(t!("common.retry"))
                         .on_click(cx.listener(|this, _, _window, cx| {
                             this.state = LoadState::Loading;
                             cx.notify();
@@ -615,7 +625,7 @@ impl ServersView {
                 .into_any_element(),
             LoadState::Loaded(servers) if servers.is_empty() => div()
                 .text_color(theme.text_muted)
-                .child("No servers available.")
+                .child(t!("servers.none_available").to_string())
                 .into_any_element(),
             LoadState::Loaded(servers) => {
                 // Hide servers that are already configured (matched on host:port).
@@ -625,7 +635,7 @@ impl ServersView {
                     return div()
                         .text_sm()
                         .text_color(theme.text_muted)
-                        .child("All available servers have been added.")
+                        .child(t!("servers.all_added").to_string())
                         .into_any_element();
                 }
                 let rows = available.into_iter().map(|server| {
@@ -657,10 +667,13 @@ impl ServersView {
                                         .truncate()
                                         .text_xs()
                                         .text_color(theme.text_muted)
-                                        .child(format!(
-                                            "by {} · {}:{}",
-                                            server.owner, server.address, server.port
-                                        )),
+                                        .child(t!(
+                                            "servers.by_address",
+                                            owner = server.owner,
+                                            address = server.address,
+                                            port = server.port,
+                                        )
+                                        .to_string()),
                                 ),
                         )
                         .child(
@@ -668,7 +681,7 @@ impl ServersView {
                                 .primary()
                                 .xsmall()
                                 .icon(Icon::new(IconName::Plus))
-                                .label("Add")
+                                .label(t!("servers.add"))
                                 .on_click(cx.listener(move |this, _, _window, cx| {
                                     this.add_server(server_for_add.clone(), cx)
                                 })),
@@ -699,12 +712,12 @@ impl Render for ServersView {
                     .flex()
                     .flex_col()
                     .gap_1()
-                    .child(div().text_2xl().font_weight(FontWeight::BOLD).child("Servers"))
+                    .child(div().text_2xl().font_weight(FontWeight::BOLD).child(t!("nav.servers")))
                     .child(
                         div()
                             .text_sm()
                             .text_color(theme.text_muted)
-                            .child("Add community servers as Among Us regions. Restart the game to pick up changes."),
+                            .child(t!("servers.description").to_string()),
                     ),
             )
             .children(self.error.clone().map(|message| {
@@ -733,13 +746,13 @@ impl Render for ServersView {
                             .flex()
                             .items_center()
                             .justify_between()
-                            .child(section_label("Installed regions", &theme))
+                            .child(section_label(t!("servers.installed_regions"), &theme))
                             .child(
                                 Button::new("add-custom-server")
                                     .ghost()
                                     .xsmall()
                                     .icon(Icon::new(IconName::Plus))
-                                    .label("Add custom")
+                                    .label(t!("servers.add_custom"))
                                     .on_click(cx.listener(|this, _, window, cx| {
                                         this.open_custom_dialog(window, cx)
                                     })),
@@ -752,7 +765,7 @@ impl Render for ServersView {
                     .flex()
                     .flex_col()
                     .gap_2()
-                    .child(section_label("Available servers", &theme))
+                    .child(section_label(t!("servers.available"), &theme))
                     .child(self.render_available(&theme, cx)),
             )
     }

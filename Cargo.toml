@@ -28,6 +28,7 @@ gpui-component = { git = "https://github.com/longbridge/gpui-component", feature
 gpui-component-assets = { git = "https://github.com/longbridge/gpui-component" }
 tree-sitter = "0.26"
 tree-sitter-md = "0.5"
+rust-i18n = "4.2"
 log = "0.4"
 env_logger = "0.11"
 serde = { version = "1.0.228", features = ["derive"] }
