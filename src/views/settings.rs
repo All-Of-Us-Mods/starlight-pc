@@ -781,7 +781,7 @@ impl Render for SettingsView {
                         .on_click(|_, window, cx| detect_linux_runtime(window, cx))
                 }),
             )
-            .description(t!("settings.linux.auto_detect_desc"));
+            .description(t!("settings.linux.auto_detect_desc").to_string());
 
             let runner = SettingItem::new(
                 t!("settings.linux.runner"),
@@ -799,7 +799,7 @@ impl Render for SettingsView {
                     patch_linux_runner_kind,
                 ),
             )
-            .description(t!("settings.linux.runner_desc"));
+            .description(t!("settings.linux.runner_desc").to_string());
 
             let runner_binary = stacked_item(
                 t!("settings.linux.runner_binary"),
@@ -835,7 +835,7 @@ impl Render for SettingsView {
                     patch_linux_wine_region_info_path,
                 ),
             )
-            .description(t!("settings.linux.region_info_desc"));
+            .description(t!("settings.linux.region_info_desc").to_string());
 
             let proton_compat = stacked_item(
                 t!("settings.linux.proton_compat"),
@@ -851,7 +851,7 @@ impl Render for SettingsView {
                     patch_linux_proton_compat_data_path,
                 ),
             )
-            .description(t!("settings.linux.proton_compat_desc"));
+            .description(t!("settings.linux.proton_compat_desc").to_string());
 
             let steam_run = SettingItem::new(
                 t!("settings.linux.steam_run"),
@@ -860,7 +860,7 @@ impl Render for SettingsView {
                     patch_linux_proton_use_steam_run,
                 ),
             )
-            .description(t!("settings.linux.steam_run_desc"));
+            .description(t!("settings.linux.steam_run_desc").to_string());
 
             // Only show the fields the selected runner actually uses.
             let items = match kind {
