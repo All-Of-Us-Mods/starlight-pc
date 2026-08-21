@@ -3,7 +3,6 @@
 #![cfg_attr(all(windows, not(debug_assertions)), windows_subsystem = "windows")]
 
 use gpui::*;
-use std::borrow::Cow;
 
 // Registers the app's `locales/` directory as a translation backend (merged
 // with gpui-component's built-ins via `extend!` below). English is the source
@@ -22,42 +21,6 @@ mod theme;
 mod ui;
 mod views;
 mod workspace;
-
-/// (locale code, native display name) for every translated locale, in a
-/// stable order. Drives the Settings → Appearance language dropdown.
-pub fn available_languages() -> Vec<(String, String)> {
-    let names = [
-        ("en", "English"),
-        ("de", "Deutsch"),
-        ("fr", "Français"),
-        ("es", "Español"),
-        ("pt-BR", "Português (Brasil)"),
-        ("ru", "Русский"),
-        ("ja", "日本語"),
-        ("zh-CN", "简体中文"),
-    ];
-    let mut codes: Vec<String> = rust_i18n::available_locales!()
-        .into_iter()
-        .map(Cow::into_owned)
-        .collect();
-    codes.sort_by_key(|code| {
-        names
-            .iter()
-            .position(|(name, _)| name == code)
-            .unwrap_or(usize::MAX)
-    });
-    codes
-        .into_iter()
-        .map(|code| {
-            let name = names
-                .iter()
-                .find(|(known, _)| *known == code)
-                .map(|(_, name)| *name)
-                .unwrap_or(code.as_str());
-            (code.to_string(), name.to_string())
-        })
-        .collect()
-}
 
 use backend::deeplink::{self, DeepLink};
 use backend::single_instance;
@@ -287,11 +250,5 @@ mod i18n_tests {
             rust_i18n::t!("titlebar.launch", name = "Foo"),
             "Launch Foo"
         );
-    }
-
-    #[test]
-    fn only_real_locales_are_available() {
-        let locales = crate::available_languages();
-        assert_eq!(locales, vec![("en".to_string(), "English".to_string())]);
     }
 }

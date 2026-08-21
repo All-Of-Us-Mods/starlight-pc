@@ -25,6 +25,35 @@ use rust_i18n::t;
 
 type PathSetter = Rc<dyn Fn(SharedString, &mut App)>;
 
+/// (locale code, native display name) pairs for the Settings → Appearance
+/// language dropdown. Codes come from the locale files under `locales/`; a
+/// code without an entry in `NAMES` is shown as-is.
+fn language_options() -> Vec<(SharedString, SharedString)> {
+    const NAMES: &[(&str, &str)] = &[
+        ("en", "English"),
+        ("nl", "Nederlands"),
+        ("de", "Deutsch"),
+        ("fr", "Français"),
+        ("es", "Español"),
+        ("pt-BR", "Português (Brasil)"),
+        ("ru", "Русский"),
+        ("ja", "日本語"),
+        ("zh-CN", "简体中文"),
+    ];
+    rust_i18n::available_locales!()
+        .into_iter()
+        .map(|code| {
+            let name = NAMES
+                .iter()
+                .find(|(known, _)| *known == code.as_ref())
+                .map(|(_, name)| *name)
+                .unwrap_or(code.as_ref())
+                .to_string();
+            (code.into_owned().into(), name.into())
+        })
+        .collect()
+}
+
 pub struct SettingsView;
 
 impl SettingsView {
@@ -645,10 +674,7 @@ impl Render for SettingsView {
             .map(|name| (name.clone(), name))
             .collect();
 
-        let language_options: Vec<(SharedString, SharedString)> = crate::available_languages()
-            .into_iter()
-            .map(|(code, name)| (code.into(), name.into()))
-            .collect();
+        let language_options: Vec<(SharedString, SharedString)> = language_options();
 
         let appearance_page = SettingPage::new(t!("settings.page.appearance")).group(
             SettingGroup::new().title(t!("settings.group.theme")).items(vec![
@@ -956,5 +982,20 @@ impl Render for SettingsView {
                         pages
                     }),
             )
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn language_options_lists_exactly_the_shipped_locales() {
+        let options = super::language_options();
+        assert_eq!(
+            options,
+            vec![
+                ("en".into(), "English".into()),
+                ("nl".into(), "Nederlands".into()),
+            ]
+        );
     }
 }
