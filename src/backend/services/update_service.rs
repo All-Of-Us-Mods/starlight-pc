@@ -56,9 +56,10 @@ fn parse_sha256_digest(digest: &str) -> Option<String> {
 pub fn check_for_update() -> AppResult<Option<UpdateInfo>> {
     info!("checking for updates against {RELEASES_API_URL}");
 
-    let client = reqwest::blocking::Client::builder()
-        .timeout(REQUEST_TIMEOUT)
-        .build()?;
+    let client = crate::backend::services::http_download::http_client(
+        REQUEST_TIMEOUT,
+        REQUEST_TIMEOUT,
+    )?;
 
     let release: GithubRelease = client
         .get(RELEASES_API_URL)
@@ -125,7 +126,7 @@ pub fn apply_update_and_relaunch(info: &UpdateInfo) -> AppResult<()> {
         "downloading update {} from {}",
         info.version, info.download_url
     );
-    http_download::download_file(&info.download_url, &download_path, |_, _| {})?;
+    http_download::download_file(&info.download_url, &download_path, None, None, |_, _| {})?;
 
     let Some(expected) = info.expected_sha256.as_deref() else {
         let _ = fs::remove_file(&download_path);

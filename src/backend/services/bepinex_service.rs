@@ -107,7 +107,7 @@ pub fn install_bepinex(
 
     let temp = dest.with_extension("zip.tmp");
     emit("downloading", 0.0, "Downloading...", target_type, target_id);
-    download_file(&url, &temp, |dl, total| {
+    download_file(&url, &temp, None, None, |dl, total| {
         emit_download_progress(dl, total, target_type, target_id)
     })?;
 
@@ -147,7 +147,7 @@ pub fn download_bepinex_to_cache(
         BepInExTargetType::Cache,
         &architecture,
     );
-    download_file(&url, cache_file, |dl, total| {
+    download_file(&url, cache_file, None, None, |dl, total| {
         emit_download_progress(dl, total, BepInExTargetType::Cache, &architecture)
     })?;
 

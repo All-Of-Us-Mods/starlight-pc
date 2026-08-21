@@ -227,10 +227,10 @@ pub fn fetch_servers() -> AppResult<Vec<Server>> {
 /// a non-implementing or unresponsive server from stalling a refresh — callers
 /// treat any error as "this server has no lobby list" and skip it.
 pub fn fetch_lobbies(host: &str, port: u16) -> AppResult<GamesResult> {
-    let client = reqwest::blocking::Client::builder()
-        .connect_timeout(std::time::Duration::from_secs(5))
-        .timeout(std::time::Duration::from_secs(8))
-        .build()?;
+    let client = crate::backend::services::http_download::http_client(
+        std::time::Duration::from_secs(5),
+        std::time::Duration::from_secs(8),
+    )?;
 
     let mut last_err = None;
     for scheme in ["https", "http"] {
