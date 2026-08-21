@@ -9,21 +9,14 @@ use uuid::Uuid;
 #[derive(Clone, Debug, serde::Serialize)]
 pub struct ModDownloadProgress {
     pub mod_id: String,
-    pub downloaded: u64,
-    pub total: Option<u64>,
     pub progress: f64,
     pub stage: String,
 }
 
-fn emit_progress(mod_id: &str, downloaded: u64, total: Option<u64>, stage: &str) {
-    let progress = total
-        .map(|t| downloaded as f64 / t as f64 * 100.0)
-        .unwrap_or(0.0);
+fn emit_progress(mod_id: &str, progress: f64, stage: &str) {
     crate::backend::events::publish(crate::backend::events::BackendEvent::ModDownloadProgress(
         ModDownloadProgress {
             mod_id: mod_id.to_string(),
-            downloaded,
-            total,
             progress,
             stage: stage.to_string(),
         },
@@ -43,7 +36,7 @@ pub fn download_mod(
 
     let tracking_id = get_tracking_id()?;
 
-    emit_progress(&mod_id, 0, None, "connecting");
+    emit_progress(&mod_id, 0.0, "connecting");
 
     // Download to a `.part` file so a failed/interrupted download never
     // leaves a truncated plugin in place of the real one.
@@ -60,11 +53,12 @@ pub fn download_mod(
             // size is unknown/zero) so a large download doesn't flood the
             // event bus.
             let pct = total
-                .and_then(|t| (downloaded * 100).checked_div(t))
-                .unwrap_or(0) as i64;
-            if pct != last_pct {
-                last_pct = pct;
-                emit_progress(&mod_id, downloaded, total, "downloading");
+                .filter(|t| *t > 0)
+                .map(|t| downloaded as f64 / t as f64 * 100.0)
+                .unwrap_or(0.0);
+            if pct as i64 != last_pct {
+                last_pct = pct as i64;
+                emit_progress(&mod_id, pct, "downloading");
             }
         },
     );
@@ -74,7 +68,7 @@ pub fn download_mod(
         return Err(e);
     }
 
-    emit_progress(&mod_id, 0, None, "verifying");
+    emit_progress(&mod_id, 100.0, "verifying");
     let computed_checksum = finish_digest(&mut hasher);
     if let Some(expected) = expected_checksum.filter(|checksum| !checksum.is_empty())
         && computed_checksum != expected.to_lowercase()
@@ -85,10 +79,10 @@ pub fn download_mod(
         )));
     }
 
-    emit_progress(&mod_id, 0, None, "writing");
+    emit_progress(&mod_id, 100.0, "writing");
     fs::rename(&part_path, dest_path)?;
 
-    emit_progress(&mod_id, 0, None, "complete");
+    emit_progress(&mod_id, 100.0, "complete");
     info!("Mod download completed: {} -> {:?}", mod_id, dest_path);
     Ok(())
 }
