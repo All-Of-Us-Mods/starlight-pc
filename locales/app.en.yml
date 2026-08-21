@@ -194,7 +194,7 @@ profile:
   add_dll_prompt: Add BepInEx plugin (.dll)
   drop_dll: Drop a mod .dll to add it to this profile
   drop_zip: Import profile .zips from the Library page
-  added: 'Added region "%{name}"'
+  added: "Added %{names}"
   custom_mod: Custom
   no_mods: No mods installed. Install from Explore, or drop a BepInEx plugin .dll here.
   mods_heading: "Mods · %{count}"
