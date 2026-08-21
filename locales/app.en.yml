@@ -20,6 +20,7 @@ common:
   retry: Retry
   unknown: Unknown
   never: Never
+  failed: "Failed: %{error}"
 time:
   hours_minutes: "%{hours}h %{minutes}m"
   minutes: "%{minutes} min"

@@ -20,6 +20,7 @@ common:
   retry: Opnieuw proberen
   unknown: Onbekend
   never: Nooit
+  failed: "Mislukt: %{error}"
 time:
   hours_minutes: "%{hours}u %{minutes}m"
   minutes: "%{minutes} min"
