@@ -417,9 +417,24 @@ pub fn create_profile(name: &str) -> AppResult<ProfileEntry> {
     Ok(profile)
 }
 
+/// The profile with `profile_id`, or a validation error naming it.
+fn load_profile(profile_id: &str) -> AppResult<ProfileEntry> {
+    get_profile_by_id(profile_id)?
+        .ok_or_else(|| AppError::validation(format!("Profile '{profile_id}' not found")))
+}
+
+/// The bare file name of a stored plugin file, rejecting anything that isn't
+/// already a plain name (path separators, `..`, empty).
+fn base_file_name(file: &str) -> AppResult<&str> {
+    Path::new(file)
+        .file_name()
+        .and_then(|name| name.to_str())
+        .filter(|name| *name == file && !file.contains('/') && !file.contains('\\'))
+        .ok_or_else(|| AppError::validation("Invalid mod file name"))
+}
+
 pub fn install_bepinex_for_profile(profile_id: &str) -> AppResult<()> {
-    let mut profile = get_profile_by_id(profile_id)?
-        .ok_or_else(|| AppError::validation(format!("Profile '{profile_id}' not found")))?;
+    let mut profile = load_profile(profile_id)?;
 
     let settings = core_service::get_settings()?;
     let install_arch = settings.game_platform.bepinex_arch();
@@ -449,11 +464,7 @@ pub fn install_bepinex_for_profile(profile_id: &str) -> AppResult<()> {
 }
 
 pub fn delete_profile(profile_id: &str) -> AppResult<()> {
-    let Some(profile) = get_profile_by_id(profile_id)? else {
-        return Err(AppError::validation(format!(
-            "Profile '{profile_id}' not found"
-        )));
-    };
+    let profile = load_profile(profile_id)?;
     let path = PathBuf::from(profile.path);
     if path.exists() {
         fs::remove_dir_all(path)?;
@@ -477,21 +488,13 @@ pub fn rename_profile(profile_id: &str, new_name: &str) -> AppResult<()> {
         )));
     }
 
-    let Some(mut profile) = get_profile_by_id(profile_id)? else {
-        return Err(AppError::validation(format!(
-            "Profile '{profile_id}' not found"
-        )));
-    };
+    let mut profile = load_profile(profile_id)?;
     profile.name = trimmed.to_string();
     write_profile(&profile)
 }
 
 pub fn update_profile_icon(profile_id: &str, selection: ProfileIconSelection) -> AppResult<()> {
-    let Some(mut profile) = get_profile_by_id(profile_id)? else {
-        return Err(AppError::validation(format!(
-            "Profile '{profile_id}' not found"
-        )));
-    };
+    let mut profile = load_profile(profile_id)?;
 
     match selection {
         ProfileIconSelection::Default => {
@@ -561,17 +564,9 @@ pub fn add_mod_to_profile(
     version: &str,
     file: &str,
 ) -> AppResult<()> {
-    let base_name = Path::new(file)
-        .file_name()
-        .and_then(|name| name.to_str())
-        .filter(|name| *name == file && !file.contains('/') && !file.contains('\\'))
-        .ok_or_else(|| AppError::validation("Invalid mod file name"))?;
+    let base_name = base_file_name(file)?;
 
-    let Some(mut profile) = get_profile_by_id(profile_id)? else {
-        return Err(AppError::validation(format!(
-            "Profile '{profile_id}' not found"
-        )));
-    };
+    let mut profile = load_profile(profile_id)?;
 
     if let Some(existing) = profile
         .mods
@@ -604,11 +599,7 @@ pub fn add_mod_to_profile(
 /// Enable or disable a profile's mod. BepInEx only loads `*.dll`, so a disabled
 /// mod is kept on disk as `<file>.disabled` and renamed back when re-enabled.
 pub fn set_mod_enabled(profile_id: &str, mod_id: &str, enabled: bool) -> AppResult<()> {
-    let Some(mut profile) = get_profile_by_id(profile_id)? else {
-        return Err(AppError::validation(format!(
-            "Profile '{profile_id}' not found"
-        )));
-    };
+    let mut profile = load_profile(profile_id)?;
     let Some(index) = profile.mods.iter().position(|m| m.mod_id == mod_id) else {
         return Err(AppError::validation("Mod is not installed in this profile"));
     };
@@ -618,11 +609,7 @@ pub fn set_mod_enabled(profile_id: &str, mod_id: &str, enabled: bool) -> AppResu
         ));
     };
 
-    let base_name = Path::new(&file)
-        .file_name()
-        .and_then(|name| name.to_str())
-        .filter(|name| *name == file && !file.contains('/') && !file.contains('\\'))
-        .ok_or_else(|| AppError::validation("Invalid mod file name"))?;
+    let base_name = base_file_name(&file)?;
 
     let plugins_dir = PathBuf::from(&profile.path).join("BepInEx").join("plugins");
     let enabled_path = plugins_dir.join(base_name);
@@ -641,21 +628,13 @@ pub fn set_mod_enabled(profile_id: &str, mod_id: &str, enabled: bool) -> AppResu
 }
 
 pub fn add_play_time(profile_id: &str, duration_ms: i64) -> AppResult<()> {
-    let Some(mut profile) = get_profile_by_id(profile_id)? else {
-        return Err(AppError::validation(format!(
-            "Profile '{profile_id}' not found"
-        )));
-    };
+    let mut profile = load_profile(profile_id)?;
     profile.total_play_time = Some(profile.total_play_time.unwrap_or(0) + duration_ms);
     write_profile(&profile)
 }
 
 pub fn remove_mod_from_profile(profile_id: &str, mod_id: &str) -> AppResult<()> {
-    let Some(mut profile) = get_profile_by_id(profile_id)? else {
-        return Err(AppError::validation(format!(
-            "Profile '{profile_id}' not found"
-        )));
-    };
+    let mut profile = load_profile(profile_id)?;
     profile.mods.retain(|mod_entry| mod_entry.mod_id != mod_id);
     normalize_icon_selection(&mut profile);
     write_profile(&profile)
@@ -666,11 +645,7 @@ pub fn remove_mod_from_profile(profile_id: &str, mod_id: &str) -> AppResult<()> 
 /// matters for custom mods: [`sync_custom_mods`] would otherwise resurrect the
 /// entry from the leftover DLL on the next profile read.
 pub fn uninstall_mod_from_profile(profile_id: &str, mod_id: &str) -> AppResult<()> {
-    let Some(profile) = get_profile_by_id(profile_id)? else {
-        return Err(AppError::validation(format!(
-            "Profile '{profile_id}' not found"
-        )));
-    };
+    let profile = load_profile(profile_id)?;
     let Some(entry) = profile.mods.iter().find(|m| m.mod_id == mod_id) else {
         return Err(AppError::validation("Mod is not installed in this profile"));
     };
@@ -702,11 +677,7 @@ pub fn import_mod_to_profile(profile_id: &str, source_path: &str) -> AppResult<S
         return Err(AppError::validation("Invalid mod file name"));
     }
 
-    let Some(profile) = get_profile_by_id(profile_id)? else {
-        return Err(AppError::validation(format!(
-            "Profile '{profile_id}' not found"
-        )));
-    };
+    let profile = load_profile(profile_id)?;
 
     let destination = PathBuf::from(&profile.path)
         .join("BepInEx")
@@ -724,13 +695,7 @@ pub fn import_mod_to_profile(profile_id: &str, source_path: &str) -> AppResult<S
 }
 
 pub fn delete_mod_file(profile_path: &str, file_name: &str) -> AppResult<()> {
-    let base_name = Path::new(file_name)
-        .file_name()
-        .and_then(|name| name.to_str())
-        .ok_or_else(|| AppError::validation("Invalid mod file name"))?;
-    if base_name != file_name || file_name.contains('/') || file_name.contains('\\') {
-        return Err(AppError::validation("Invalid mod file name"));
-    }
+    let base_name = base_file_name(file_name)?;
 
     let plugins_dir = PathBuf::from(profile_path).join("BepInEx").join("plugins");
     let path = plugins_dir.join(base_name);
@@ -984,11 +949,7 @@ pub fn import_profile_zip(zip_path: &str) -> AppResult<Vec<ProfileEntry>> {
 }
 
 pub fn export_profile_zip(profile_id: &str, destination: &str) -> AppResult<()> {
-    let Some(profile) = get_profile_by_id(profile_id)? else {
-        return Err(AppError::validation(format!(
-            "Profile '{profile_id}' not found"
-        )));
-    };
+    let profile = load_profile(profile_id)?;
     profile_zip_service::export_profile_zip(profile.path, destination.to_string(), |p| {
         publish_zip_progress(ZipOp::Export, p)
     })

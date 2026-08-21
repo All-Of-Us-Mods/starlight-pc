@@ -97,8 +97,8 @@ pub struct LaunchVanillaArgs {
 
 #[cfg(not(any(windows, target_os = "linux")))]
 fn build_game_command(_game_exe: &str) -> AppResult<Command> {
-    Err(AppError::Platform(
-        "Launching the game is not supported on this platform".to_string(),
+    Err(AppError::platform(
+        "Launching the game is not supported on this platform",
     ))
 }
 

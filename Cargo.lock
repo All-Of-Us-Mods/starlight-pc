@@ -10,7 +10,6 @@ dependencies = [
  "chrono",
  "directories",
  "env_logger",
- "flate2",
  "gpui",
  "gpui-component",
  "gpui-component-assets",

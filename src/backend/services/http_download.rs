@@ -1,5 +1,6 @@
 use crate::backend::error::AppResult;
 use log::debug;
+use sha2::{Digest, Sha256};
 use std::fs::{self, File};
 use std::io::{Read, Write};
 use std::path::Path;
@@ -10,7 +11,28 @@ const CONNECT_TIMEOUT: Duration = Duration::from_secs(30);
 const REQUEST_TIMEOUT: Duration = Duration::from_secs(300);
 const READ_CHUNK: usize = 64 * 1024;
 
-pub fn download_file<F>(url: &str, dest_path: &Path, mut on_progress: F) -> AppResult<()>
+/// Blocking HTTP client with the given timeouts, shared by every backend
+/// fetcher so connection behavior stays consistent.
+pub fn http_client(
+    connect_timeout: Duration,
+    request_timeout: Duration,
+) -> AppResult<reqwest::blocking::Client> {
+    Ok(reqwest::blocking::Client::builder()
+        .connect_timeout(connect_timeout)
+        .timeout(request_timeout)
+        .build()?)
+}
+
+/// Stream `url` into `dest_path`, creating parent dirs, reporting
+/// `(downloaded, total)` per chunk. Optionally sends one extra header and
+/// hashes the body into `hasher` as it goes.
+pub fn download_file<F>(
+    url: &str,
+    dest_path: &Path,
+    extra_header: Option<(&str, String)>,
+    mut hasher: Option<&mut Sha256>,
+    mut on_progress: F,
+) -> AppResult<()>
 where
     F: FnMut(u64, Option<u64>),
 {
@@ -18,12 +40,13 @@ where
         fs::create_dir_all(parent)?;
     }
 
-    let client = reqwest::blocking::Client::builder()
-        .connect_timeout(CONNECT_TIMEOUT)
-        .timeout(REQUEST_TIMEOUT)
-        .build()?;
+    let client = http_client(CONNECT_TIMEOUT, REQUEST_TIMEOUT)?;
 
-    let mut response = client.get(url).send()?.error_for_status()?;
+    let mut request = client.get(url);
+    if let Some((name, value)) = extra_header {
+        request = request.header(name, value);
+    }
+    let mut response = request.send()?.error_for_status()?;
     let total: Option<u64> = response.content_length();
 
     let mut file = File::create(dest_path)?;
@@ -35,12 +58,21 @@ where
         if n == 0 {
             break;
         }
+        if let Some(hasher) = hasher.as_deref_mut() {
+            hasher.update(&buf[..n]);
+        }
         file.write_all(&buf[..n])?;
         downloaded += n as u64;
         on_progress(downloaded, total);
     }
 
     Ok(())
+}
+
+/// Hex digest of everything hashed so far. Call after `download_file` when
+/// verifying a checksum.
+pub fn finish_digest(hasher: &mut Sha256) -> String {
+    crate::backend::services::hex_digest(std::mem::take(hasher).finalize())
 }
 
 pub fn extract_zip<F>(zip_path: &Path, dest_path: &Path, mut on_progress: F) -> AppResult<()>
