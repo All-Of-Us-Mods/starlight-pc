@@ -72,6 +72,10 @@ pub struct LibraryDetailView {
     log_panel: Entity<LogPanel>,
     /// API-resolved display names per mod_id, populated lazily after load.
     mod_names: HashMap<String, String>,
+    /// Whether the cursor is over the hero icon / name, revealing their
+    /// inline edit buttons.
+    icon_hovered: bool,
+    name_hovered: bool,
 }
 
 pub(super) enum LoadState {
@@ -99,6 +103,8 @@ impl LibraryDetailView {
             pending_launches: 0,
             log_panel,
             mod_names: mod_catalog_cache::cached_names(),
+            icon_hovered: false,
+            name_hovered: false,
         };
 
         view.spawn_load(cx);
@@ -892,32 +898,13 @@ impl LibraryDetailView {
     }
 
     /// Quiet toolbar of secondary profile actions shown at the bottom of the
-    /// hero card.
+    /// hero card. Rename and icon editing live inline on the hero itself,
+    /// revealed on hover.
     fn render_manage_buttons(&self, cx: &mut Context<Self>) -> AnyElement {
         let manage_buttons = div()
             .flex()
             .gap_1()
             .flex_wrap()
-            .child(
-                Button::new("rename-profile-action")
-                    .ghost()
-                    .small()
-                    .icon(Icon::new(IconName::Replace))
-                    .label("Rename")
-                    .on_click(cx.listener(|this, _, window, cx| {
-                        this.open_rename_dialog(window, cx);
-                    })),
-            )
-            .child(
-                Button::new("edit-icon-action")
-                    .ghost()
-                    .small()
-                    .icon(Icon::new(IconName::Palette))
-                    .label("Edit Icon")
-                    .on_click(cx.listener(|this, _, window, cx| {
-                        this.open_icon_dialog(window, cx);
-                    })),
-            )
             .child(
                 Button::new("open-profile-folder-action")
                     .ghost()
@@ -1009,10 +996,39 @@ impl LibraryDetailView {
             .min_w_0()
             .child(
                 div()
-                    .text_2xl()
-                    .font_weight(FontWeight::BOLD)
-                    .truncate()
-                    .child(profile.name.clone()),
+                    .id("profile-name-area")
+                    .flex()
+                    .items_center()
+                    .gap_2()
+                    .min_w_0()
+                    .cursor_pointer()
+                    .on_hover(cx.listener(|this, hovered: &bool, _window, cx| {
+                        if this.name_hovered != *hovered {
+                            this.name_hovered = *hovered;
+                            cx.notify();
+                        }
+                    }))
+                    .on_click(cx.listener(|this, _, window, cx| {
+                        this.open_rename_dialog(window, cx);
+                    }))
+                    .child(
+                        div()
+                            .min_w_0()
+                            .text_2xl()
+                            .font_weight(FontWeight::BOLD)
+                            .truncate()
+                            .child(profile.name.clone()),
+                    )
+                    .when(self.name_hovered, |row| {
+                        row.child(
+                            // Affordance only — the whole name area is the
+                            // click target.
+                            Icon::new(AppIcon::Pencil)
+                                .small()
+                                .flex_none()
+                                .text_color(theme.text_muted),
+                        )
+                    }),
             )
             .child(div().text_sm().text_color(theme.text_muted).child(format!(
                 "{} played",
@@ -1059,7 +1075,39 @@ impl LibraryDetailView {
                     .items_center()
                     .gap_4()
                     .flex_wrap()
-                    .child(profile_icon(profile, 80.0))
+                    .child(
+                        div()
+                            .id("profile-icon-area")
+                            .relative()
+                            .flex_none()
+                            .on_hover(cx.listener(|this, hovered: &bool, _window, cx| {
+                                if this.icon_hovered != *hovered {
+                                    this.icon_hovered = *hovered;
+                                    cx.notify();
+                                }
+                            }))
+                            .child(profile_icon(profile, 80.0))
+                            .when(self.icon_hovered, |icon| {
+                                icon.child(
+                                    div()
+                                        .id("profile-icon-edit")
+                                        .absolute()
+                                        .inset_0()
+                                        .rounded_md()
+                                        .bg(black().opacity(0.55))
+                                        .cursor_pointer()
+                                        .flex()
+                                        .items_center()
+                                        .justify_center()
+                                        .on_click(cx.listener(|this, _, window, cx| {
+                                            this.open_icon_dialog(window, cx);
+                                        }))
+                                        // White reads on the dark scrim
+                                        // regardless of image or theme.
+                                        .child(Icon::new(AppIcon::Pencil).text_color(white())),
+                                )
+                            }),
+                    )
                     .child(title_col)
                     .children(primary_controls.map(|c| div().flex_none().child(c))),
             )
