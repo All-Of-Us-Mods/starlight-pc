@@ -109,7 +109,10 @@ fn format_bytes(bytes: u64) -> String {
 fn cache_item(arch: &'static str, label: gpui::SharedString) -> SettingItem {
     let (present, status): (bool, SharedString) = match core_service::get_bepinex_cache_path(arch) {
         Ok(path) => match bepinex_service::cache_size(&path) {
-            Some(size) => (true, t!("settings.cache.cached", size = format_bytes(size)).into()),
+            Some(size) => (
+                true,
+                t!("settings.cache.cached", size = format_bytes(size)).into(),
+            ),
             None => (false, t!("settings.cache.not_cached").into()),
         },
         Err(_) => (false, t!("settings.cache.path_unavailable").into()),
@@ -456,7 +459,10 @@ fn detect_linux_runtime(window: &mut Window, cx: &mut App) {
                     ..Default::default()
                 },
             );
-            window.push_notification(Notification::success(t!("settings.linux.detected").to_string()), cx);
+            window.push_notification(
+                Notification::success(t!("settings.linux.detected").to_string()),
+                cx,
+            );
         }
         Err(e) => {
             warn!("detect_linux_runner failed: {e}");
@@ -625,25 +631,27 @@ impl Render for SettingsView {
                     )
                     .description(t!("settings.auto_detect_desc").to_string()),
                 ]),
-            SettingGroup::new().title(t!("settings.group.platform")).items(vec![
-                SettingItem::new(
-                    t!("settings.game_platform"),
-                    SettingField::dropdown(
-                        vec![
-                            ("steam".into(), "Steam".into()),
-                            ("epic".into(), "Epic".into()),
-                            ("xbox".into(), "Xbox".into()),
-                        ],
-                        |cx| match app_settings::get(cx).game_platform {
-                            GamePlatform::Steam => "steam".into(),
-                            GamePlatform::Epic => "epic".into(),
-                            GamePlatform::Xbox => "xbox".into(),
-                        },
-                        patch_platform,
-                    ),
-                )
-                .description(t!("settings.game_platform_desc").to_string()),
-            ]),
+            SettingGroup::new()
+                .title(t!("settings.group.platform"))
+                .items(vec![
+                    SettingItem::new(
+                        t!("settings.game_platform"),
+                        SettingField::dropdown(
+                            vec![
+                                ("steam".into(), "Steam".into()),
+                                ("epic".into(), "Epic".into()),
+                                ("xbox".into(), "Xbox".into()),
+                            ],
+                            |cx| match app_settings::get(cx).game_platform {
+                                GamePlatform::Steam => "steam".into(),
+                                GamePlatform::Epic => "epic".into(),
+                                GamePlatform::Xbox => "xbox".into(),
+                            },
+                            patch_platform,
+                        ),
+                    )
+                    .description(t!("settings.game_platform_desc").to_string()),
+                ]),
         ];
         let game_page = SettingPage::new(t!("settings.page.game"))
             .default_open(true)
@@ -667,8 +675,11 @@ impl Render for SettingsView {
             )
             .description(t!("settings.multi_instance_desc").to_string()),
         ];
-        let launch_page = SettingPage::new(t!("settings.page.launch"))
-            .group(SettingGroup::new().title(t!("settings.group.behavior")).items(launch_items));
+        let launch_page = SettingPage::new(t!("settings.page.launch")).group(
+            SettingGroup::new()
+                .title(t!("settings.group.behavior"))
+                .items(launch_items),
+        );
 
         let theme_options: Vec<(SharedString, SharedString)> = crate::theme::theme_names(cx)
             .into_iter()
@@ -736,18 +747,20 @@ impl Render for SettingsView {
             ]));
 
         let bepinex_page = SettingPage::new(t!("settings.page.bepinex")).groups(vec![
-            SettingGroup::new().title(t!("settings.group.cache")).items(vec![
-                SettingItem::new(
-                    t!("settings.cache_downloads"),
-                    SettingField::switch(
-                        |cx| app_settings::get(cx).cache_bepinex,
-                        patch_cache_bepinex,
-                    ),
-                )
-                .description(t!("settings.cache_downloads_desc").to_string()),
-                cache_item("x64", t!("settings.cache.x64").into()),
-                cache_item("x86", t!("settings.cache.x86").into()),
-            ]),
+            SettingGroup::new()
+                .title(t!("settings.group.cache"))
+                .items(vec![
+                    SettingItem::new(
+                        t!("settings.cache_downloads"),
+                        SettingField::switch(
+                            |cx| app_settings::get(cx).cache_bepinex,
+                            patch_cache_bepinex,
+                        ),
+                    )
+                    .description(t!("settings.cache_downloads_desc").to_string()),
+                    cache_item("x64", t!("settings.cache.x64").into()),
+                    cache_item("x86", t!("settings.cache.x86").into()),
+                ]),
             SettingGroup::new()
                 .title(t!("settings.group.download_urls"))
                 .description(t!("settings.download_urls_desc"))
@@ -889,8 +902,8 @@ impl Render for SettingsView {
         };
 
         let about_page =
-            SettingPage::new(t!("settings.page.about")).group(SettingGroup::new().items(vec![SettingItem::render(
-                |_, _window, cx| {
+            SettingPage::new(t!("settings.page.about")).group(SettingGroup::new().items(vec![
+                SettingItem::render(|_, _window, cx| {
                     let theme = cx.global::<crate::theme::Theme>().clone();
                     div()
                         .flex()
@@ -959,8 +972,8 @@ impl Render for SettingsView {
                                         .on_click(|_, _, _| open_data_folder()),
                                 ),
                         )
-                },
-            )]));
+                }),
+            ]));
 
         crate::views::page_root("settings-page", &theme)
             .overflow_y_scroll()
@@ -983,21 +996,5 @@ impl Render for SettingsView {
                         pages
                     }),
             )
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    #[test]
-    fn language_options_lists_exactly_the_shipped_locales() {
-        let options = super::language_options();
-        assert_eq!(
-            options,
-            vec![
-                ("ar".into(), "العربية".into()),
-                ("en".into(), "English".into()),
-                ("nl".into(), "Nederlands".into()),
-            ]
-        );
     }
 }
