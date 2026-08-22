@@ -40,6 +40,7 @@ fn language_options() -> Vec<(SharedString, SharedString)> {
         ("ru", "Русский"),
         ("ja", "日本語"),
         ("zh-CN", "简体中文"),
+        ("zh-TW", "繁體中文"),
     ];
     rust_i18n::available_locales!()
         .into_iter()

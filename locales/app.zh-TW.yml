@@ -1,0 +1,336 @@
+# Starlight UI translations (rust-i18n v1 format: locale comes from the
+# filename suffix, e.g. app.en.yml -> "en"). English is the source of truth;
+# other locales only need the keys they translate (missing keys fall back to
+# English). Keys are namespaced by page: nav, home, explore, library, profile,
+# mod, news, lobbies, servers, settings, plus common.* shared bits.
+nav:
+  home: 首頁
+  explore: 探索
+  library: 資源庫
+  servers: 伺服器
+  lobbies: 房間
+  settings: 設定
+common:
+  cancel: 取消
+  save: 儲存
+  delete: 刪除
+  close: 關閉
+  stop: 停止
+  clear: 清除
+  retry: 重試
+  unknown: 未知
+  never: 永不
+  failed: "錯誤：%{error}"
+  by_author: "作者：%{author}"
+time:
+  hours_minutes: "%{hours} 小時 %{minutes} 分鐘"
+  minutes: "%{minutes} 分鐘"
+  less_than_minute: "< 1 分鐘"
+home:
+  news: 新聞
+  trending: 熱門模組
+news:
+  unknown_date: 未知日期
+  posted_by: "發布者：%{author}"
+  content: 內容
+explore:
+  search: 搜尋模組...
+  load_failed: "載入模組失敗：%{error}"
+  no_mods: 未找到模組
+  type_label: 類型
+  sort:
+    downloads: 下載量
+    updated: 最近更新
+    newest: 最新版本
+  type:
+    all: 全部
+    all_clients: 所有客戶端
+    client_only: 僅限客戶端
+    host_only: 僅限房主端
+library:
+  profile_name: 設定檔名稱
+  new_profile: 新增設定檔
+  create: 建立
+  create_profile: 建立設定檔
+  import: 導入
+  import_profile: 導入設定檔
+  import_failed: "導入失敗：%{error}"
+  importing: "導入中… %{percent}%"
+  add_mod_failed: "新增模組失敗：%{error}"
+  unsupported_drop: 拖曳模組 .dll 檔案或導出的 .zip 設定檔
+  drop_dll_on_profile: 將模組 .dll 檔案拖曳至設定檔即可安裝
+  vanilla_failed: "原版啟動失敗：%{error}"
+  launch_vanilla: 啟動原版
+  stop_all: "全部停止 (%{count})"
+  load_failed: "載入設定檔失敗：%{error}"
+  empty: 尚未建立設定檔。點擊「建立設定檔」或將導出的 .zip 設定檔拖曳至此處。
+  setup_banner: 尚未設定 Among Us 路徑 — 目前無法從設定檔啟動。
+  open_settings: 開啟設定
+  card_stats: "%{mods} 個模組 · 已遊玩 %{played} 次"
+  last_launched: "上次啟動於 %{when}"
+mod:
+  fallback_title: 模組
+  new_profile_name: 新增設定檔名稱
+  empty_profile_name: 設定檔名稱不能為空
+  pick_profile: 請先選擇一個設定檔
+  installing_bepinex_mods: 正在安裝 BepInEx 與模組…
+  installing_mods: 正在安裝模組…
+  bepinex_progress: "BepInEx：%{message}"
+  install_version: "安裝 v%{version}"
+  downloads: "%{count} 次下載"
+  updated: "更新於 %{date}"
+  type_label: "類型：%{kind}"
+  about: 關於
+  changelog: 更新日誌
+  links: 連結
+  licensed_under: "依 %{license} 授權"
+  resolving: 正在解析相依項…
+  installed: 已安裝。
+  new_profile_chip: "+ 新增設定檔"
+  created_on_install: 安裝時建立，並使用此模組的圖示
+  optional: "（選用）"
+  dep_label: "%{name} v%{version}%{optional}"
+  dep_detail: "%{id} — 相依條件 %{constraint}"
+  dep_already_installed: "%{detail} — 已安裝"
+  unresolved: "%{count} 個相依項無法解析，將略過：%{list}"
+  install_into: 安裝至設定檔
+  version: 版本
+  dependencies: 相依項
+  install: 安裝
+lobbies:
+  dialog_title: "啟動並進入房間 %{code}"
+  launching: 啟動中…
+  launch: 啟動
+  code_copied: "房間代碼 %{code} 已複製到剪貼簿。"
+  code_copied_notice: 房間代碼已複製到剪貼簿。
+  copy_code: 複製房間代碼
+  regions_unavailable: "%{reason} 請在「伺服器」分頁中新增伺服器，以瀏覽其房間。"
+  regions_unavailable_title: 無法讀取您的 Among Us 伺服器區域
+  empty: 未找到開放中的房間。只有發布房間列表的伺服器會顯示在此處。
+  unknown_host: 未知房主
+  modded_profile: 模組設定檔
+  bepinex_will_install: 將安裝 BepInEx
+  temporary_profile: 暫存設定檔
+  temporary_profile_subtitle: 全新的設定檔，遊戲關閉後會自動刪除
+  region: "區域：%{region}"
+  profile: 設定檔
+  no_mods_required: 不需要模組。
+  required_mods: 必要模組
+  refreshing: 重新整理中…
+  description: 查看已啟用且發布公開房間列表的伺服器上的開放遊戲。啟動後，將複製的房間代碼貼到遊戲中。
+  active: 活躍房間
+  all_installed: 所有必要模組皆已安裝
+  will_install: "將安裝：%{names}"
+  more: "，另外還有 %{count} 個"
+  checking: "正在檢查 %{count} 個模組…"
+  not_in_catalog: "%{count} 個不在目錄中（將略過）"
+  unknown_map: 未知地圖
+  unknown_mod: 未知模組
+  unknown_mod_version: "未知模組 %{version}"
+  profile_gone: 所選設定檔已不存在
+  profile_gone_launch: 啟動前設定檔已消失
+  launched_region_set: 已將區域設定為此房間所在的伺服器。
+  launched: 已啟動。
+  skipped_catalog: " %{count} 個必要模組不在目錄中，已略過。"
+  skipped_failed: " %{count} 個模組安裝失敗，已略過。"
+servers:
+  added: '已新增伺服器「%{name}」'
+  already_added: '「%{name}」已新增'
+  saved: '已儲存伺服器「%{name}」'
+  my_server: 我的伺服器
+  edit_title: 編輯伺服器
+  add_title: 新增自定義伺服器
+  name: 名稱
+  address: 位址
+  port: 連接埠
+  use_dtls: 使用 DTLS
+  add: 新增
+  add_custom: 新增自定義
+  name_address_required: 名稱和位址為必填項目。
+  port_invalid: 連接埠必須是 1 到 65535 之間的數字。
+  conflict: '「%{name}」已指向該位址和連接埠。'
+  address_exists: 該位址的伺服器已存在。
+  regioninfo_unreadable: 無法讀取 regionInfo.json。
+  no_regions: 尚未設定任何伺服器。請在下方新增。
+  edit_tooltip: 編輯此伺服器
+  remove_tooltip: 移除此伺服器
+  load_failed: "載入伺服器失敗：%{error}"
+  none_available: 沒有可用的伺服器。
+  all_added: 所有可用的伺服器都已新增。
+  by_address: "由 %{owner} · %{address}:%{port}"
+  description: 將社群伺服器新增為 Among Us 區域。重新啟動遊戲以套用變更。
+  installed_regions: 已安裝的伺服器
+  available: 可用伺服器
+profile:
+  fallback_title: 設定檔
+  played: "%{time} 遊玩時間"
+  this_profile: 此設定檔
+  not_found: 找不到設定檔
+  bepinex_not_installed: BepInEx 未安裝
+  bepinex_incompatible: "此 BepInEx 安裝與 %{platform} 不相容"
+  install_bepinex: 安裝 BepInEx
+  instances_running: "%{count} 個執行個體正在執行"
+  launch_another: 啟動另一個
+  open_folder: 開啟資料夾
+  export_zip: 導出 ZIP
+  desktop_shortcut: 桌面捷徑
+  exporting: "導出中… %{percent}%"
+  exported: "已將設定檔導出至 %{dest}"
+  export_failed: "導出失敗：%{error}"
+  shortcut_created: "已在 %{path} 建立捷徑"
+  shortcut_failed: "建立捷徑失敗：%{error}"
+  rename_title: 重新命名設定檔
+  rename_failed: "重新命名失敗：%{error}"
+  delete_title: 刪除設定檔
+  delete_desc: '刪除「%{name}」？其模組和日誌將從磁碟移除。此操作無法復原。'
+  delete_failed: "刪除失敗：%{error}"
+  delete_profile: 刪除設定檔
+  delete_this_profile: 刪除此設定檔
+  delete_this_profile_desc: 從磁碟移除該設定檔及其模組和日誌。此操作無法復原。
+  danger_zone: 危險區域
+  remove_mod_title: 移除模組
+  remove_mod_desc: '從此設定檔中移除「%{name}」？其檔案將從磁碟刪除。'
+  remove: 移除
+  remove_mod_failed: "移除模組失敗：%{error}"
+  toggle_failed: "切換失敗：%{error}"
+  add_dll_prompt: 新增 BepInEx 外掛程式 (.dll)
+  drop_dll: 拖曳模組 .dll 檔案以將其新增至此設定檔
+  drop_zip: 從資源庫頁面導入設定檔 .zip 檔案
+  added: "已新增 %{names}"
+  custom_mod: 自定義
+  no_mods: 未安裝模組。請從「探索」安裝，或將 BepInEx 外掛程式 .dll 拖曳至此處。
+  mods_heading: "模組 · %{count}"
+  install_mods: 安裝模組
+  add_dll: 新增 DLL
+icon:
+  title: 編輯設定檔圖示
+  choose_image_prompt: 選擇圖示圖片
+  image_empty: 所選圖片為空
+  image_read_failed: "讀取圖片失敗：%{error}"
+  choose_custom: 為自定義圖示選擇圖片
+  select_mod: 選擇已安裝的模組圖示
+  update_failed: "更新圖示失敗：%{error}"
+  tab_default: 預設
+  tab_custom: 自定義圖片
+  tab_mod: 已安裝模組
+  default_desc: 使用預設設定檔圖示。
+  image_ready: 新圖片已準備好儲存。
+  using_existing: 使用現有自定義圖片。選擇新圖片以取代它。
+  formats: PNG、JPG、WEBP、GIF、BMP 或 AVIF。
+  change_image: 更換圖片
+  choose_image: 選擇圖片
+  no_mods: 未安裝模組。新增模組即可使用其圖示。
+linux:
+  wine_prefix_hint: 在「設定 → Linux 執行階段」中設定 Wine 前綴或 RegionInfo.json 路徑
+  proton_compat_hint: 在「設定 → Linux 執行階段」中設定 Proton 相容資料路徑（自動偵測可以找到它）
+notify:
+  among_us_detected: "在 %{path} 偵測到 Among Us"
+  among_us_not_found: "無法自動找到 Among Us — 啟動前請在「設定 → 遊戲」中設定其資料夾。"
+migrate:
+  offer: "發現來自舊版 Starlight 的 %{count} 個設定檔。是否將其移轉至此安裝？"
+  title: 移轉設定檔
+  action: 移轉
+  done: "已移轉 %{count} 個設定檔"
+  failed: "移轉失敗：%{error}"
+log:
+  latest: 最新日誌
+  filter: 篩選日誌…
+  copy: 複製篩選後的日誌
+  lines: "%{kept} / %{total} 行"
+  level:
+    error: 錯誤
+    warning: 警告
+    info: 資訊
+    message: 訊息
+    debug: 偵錯
+    other: 其他
+titlebar:
+  stop_count: "停止 (%{count})"
+  launch: "啟動 %{name}"
+  launch_failed: "啟動失敗：%{error}"
+  stop_failed: "停止失敗：%{error}"
+update:
+  available: "Starlight %{version} 已有可用更新。"
+  title: 有可用更新
+  restart: 重新啟動並更新
+  failed: "更新失敗：%{error}"
+settings:
+  page:
+    game: 遊戲
+    launch: 啟動
+    appearance: 外觀
+    bepinex: BepInEx
+    linux: Linux 執行階段
+    about: 關於
+  group:
+    installation: 安裝
+    platform: 平台
+    behavior: 行為
+    theme: 主題
+    cache: 快取
+    download_urls: 下載 URL
+    runner: 執行器
+    runner_desc: '透過 Steam 用戶端啟動（Steam 必須正在執行）。對於模組啟動，請將遊戲的 Steam 啟動選項設定為 WINEDLLOVERRIDES="winhttp=n,b" %command%。'
+  among_us_path: Among Us 路徑
+  among_us_path_desc: 包含 Among Us.exe 的資料夾。
+  auto_detect: 自動偵測
+  auto_detect_among_us: 自動偵測 Among Us
+  auto_detect_desc: 搜尋已知的安裝位置並設定上方路徑。
+  game_platform: 遊戲平台
+  game_platform_desc: 遊戲是從哪個商店安裝的。
+  close_on_launch: 啟動時關閉 Starlight
+  close_on_launch_desc: 啟動遊戲後退出應用程式。
+  multi_instance: 允許多個執行個體
+  multi_instance_desc: "允許同時啟動多個遊戲視窗。額外執行個體會從設定檔的暫存副本執行，因此可以立即啟動，不會與 BepInEx 檔案產生衝突。"
+  theme: 主題
+  theme_desc: 將 gpui-component 主題 JSON 檔案放入 themes 資料夾以新增自定義主題。
+  language: 語言
+  language_desc: Starlight 及其元件的介面語言。
+  themes_folder: 主題資料夾
+  open_themes_folder: 開啟主題資料夾
+  browse_themes: 瀏覽主題
+  themes_folder_desc: 內建 Starlight 主題會在每次啟動時被覆寫，編輯前請先複製一份至新檔案。
+  stars_background: 浮動星空背景
+  stars_background_desc: 在頁面後方顯示緩慢漂移的星空。
+  cache_downloads: 快取 BepInEx 下載
+  cache_downloads_desc: 在不同設定檔安裝之間重複使用快取的壓縮檔。
+  cache:
+    x64: x64 快取
+    x86: x86 快取
+    cached: "已快取 · %{size}"
+    not_cached: 未快取
+    path_unavailable: 快取路徑無法使用
+    download: 下載
+    downloaded: "已下載 BepInEx %{arch}"
+    download_failed: "BepInEx %{arch} 下載失敗：%{error}"
+    cleared: "已清除 BepInEx %{arch} 快取"
+    clear_failed: "清除失敗：%{error}"
+    path_error: "快取路徑：%{error}"
+  bepinex_x64_url: BepInEx x64 URL
+  bepinex_x86_url: BepInEx x86 URL
+  download_urls_desc: 覆寫預設的發行壓縮檔位置。
+  detected: "在 %{path} 偵測到 Among Us"
+  detected_store: "在 %{path} 偵測到 Among Us (%{store})"
+  not_detected: 無法自動偵測 Among Us 安裝位置
+  detection_failed: "偵測失敗：%{error}"
+  linux:
+    detected: 已偵測到 Linux 執行階段
+    auto_detect: 自動偵測 Linux 執行階段
+    auto_detect_desc: 從 Among Us 路徑偵測 Steam/Proton + Wine 前綴。
+    runner: 執行器
+    runner_desc: '透過 Steam 用戶端啟動（Steam 必須正在執行）。對於模組啟動，請將遊戲的 Steam 啟動選項設定為 WINEDLLOVERRIDES="winhttp=n,b" %command%。'
+    runner_binary: 執行器執行檔
+    wine_prefix: Wine 前綴
+    region_info_path: RegionInfo.json 路徑
+    region_info_desc: "Wine 前綴中的 Among Us RegionInfo.json 檔案，用於伺服器管理。若留白，則會從 Wine 前綴自動取得（drive_c/users/<your user>/AppData/LocalLow/Innersloth/Among Us）。"
+    proton_compat: Proton 相容資料路徑
+    proton_compat_desc: 遊戲的 Steam compatdata 資料夾（steamapps/compatdata/945360）。也用於定位 RegionInfo.json 以進行伺服器管理。
+    steam_run: 透過 steam-run 包裝 Proton
+    steam_run_desc: 透過 steam-run 啟動 Proton（用於 NixOS／非 FHS 系統）。停用後將直接執行 Proton 執行檔。
+  license: GNU GPLv3 授權條款
+  view_source: 檢視原始碼
+  open_data_folder: 開啟資料夾
+  path:
+    select_folder: 選擇資料夾
+    select_file: 選擇檔案
+    browse: 瀏覽
