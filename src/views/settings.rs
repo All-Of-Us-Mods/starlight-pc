@@ -30,6 +30,7 @@ type PathSetter = Rc<dyn Fn(SharedString, &mut App)>;
 /// code without an entry in `NAMES` is shown as-is.
 fn language_options() -> Vec<(SharedString, SharedString)> {
     const NAMES: &[(&str, &str)] = &[
+        ("ar", "العربية"),
         ("en", "English"),
         ("nl", "Nederlands"),
         ("de", "Deutsch"),
@@ -993,6 +994,7 @@ mod tests {
         assert_eq!(
             options,
             vec![
+                ("ar".into(), "العربية".into()),
                 ("en".into(), "English".into()),
                 ("nl".into(), "Nederlands".into()),
             ]

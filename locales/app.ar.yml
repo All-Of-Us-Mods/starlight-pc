@@ -1,0 +1,341 @@
+# Starlight UI translations (rust-i18n v1 format: locale comes from the
+# filename suffix, e.g. app.en.yml -> "en"). English is the source of truth;
+# other locales only need the keys they translate (missing keys fall back to
+# English). Keys are namespaced by page: nav, home, explore, library, profile,
+# mod, news, lobbies, servers, settings, plus common.* shared bits.
+nav:
+  home: الرئيسية
+  explore: استكشاف
+  library: المكتبة
+  servers: الخوادم
+  lobbies: الغرف
+  settings: الإعدادات
+
+common:
+  cancel: إلغاء
+  save: حفظ
+  delete: حذف
+  close: إغلاق
+  stop: إيقاف
+  clear: مسح
+  retry: إعادة المحاولة
+  unknown: غير معروف
+  never: أبداً
+  failed: "فشل: %{error}"
+
+time:
+  hours_minutes: "%{hours}س %{minutes}د"
+  minutes: "%{minutes}د"
+  less_than_minute: "< دقيقة واحدة"
+
+home:
+  news: الأخبار
+  trending: التعديلات الرائجة
+  by_author: "بواسطة %{author}"
+
+news:
+  unknown_date: تاريخ غير معروف
+  posted_by: "نشر بواسطة %{author}"
+  content: المحتوى
+
+explore:
+  search: البحث عن تعديلات...
+  load_failed: "فشل تحميل التعديلات: %{error}"
+  no_mods: لم يتم العثور على تعديلات.
+  type_label: النوع
+  sort:
+    downloads: التنزيلات
+    updated: المحدّثة مؤخراً
+    newest: الأحدث
+  type:
+    all: الكل
+    all_clients: جميع العملاء
+    client_only: للعميل فقط
+    host_only: للمضيف فقط
+
+library:
+  profile_name: اسم الملف الشخصي
+  new_profile: ملف شخصي جديد
+  create: إنشاء
+  create_profile: إنشاء ملف شخصي
+  import: استيراد
+  import_profile: استيراد ملف شخصي
+  import_failed: "فشل الاستيراد: %{error}"
+  importing: "جارٍ الاستيراد... %{percent}%"
+  add_mod_failed: "فشلت إضافة التعديل: %{error}"
+  unsupported_drop: أسقط ملف تعديل .dll أو ملف .zip لملف شخصي مُصدَّر
+  drop_dll_on_profile: أسقط ملف تعديل .dll على ملف شخصي لتثبيته
+  vanilla_failed: "فشل تشغيل اللعبة الأصلية: %{error}"
+  launch_vanilla: تشغيل اللعبة الأصلية
+  stop_all: "إيقاف الكل (%{count})"
+  load_failed: "فشل تحميل الملفات الشخصية: %{error}"
+  empty: لا توجد ملفات شخصية بعد. انقر على "إنشاء ملف شخصي" لإنشاء واحد، أو أسقط ملف .zip لملف شخصي مُصدَّر هنا.
+  setup_banner: لم يتم إعداد مسار Among Us — لا يمكن تشغيل الملفات الشخصية بعد.
+  open_settings: فتح الإعدادات
+  card_stats: "%{mods} تعديلات · تم تشغيلها %{played} مرة"
+  last_launched: "آخر تشغيل %{when}"
+
+mod:
+  fallback_title: تعديل
+  new_profile_name: اسم الملف الشخصي الجديد
+  empty_profile_name: لا يمكن أن يكون اسم الملف الشخصي فارغاً
+  pick_profile: اختر ملفاً شخصياً أولاً
+  installing_bepinex_mods: جارٍ تثبيت BepInEx + التعديلات...
+  installing_mods: جارٍ تثبيت التعديلات...
+  bepinex_progress: "BepInEx: %{message}"
+  install_version: "تثبيت v%{version}"
+  downloads: "%{count} تنزيلات"
+  updated: "تم التحديث %{date}"
+  type_label: "النوع: %{kind}"
+  about: حول
+  changelog: سجل التغييرات
+  links: الروابط
+  licensed_under: "مرخّص بموجب %{license}"
+  resolving: جارٍ حلّ الاعتماديات...
+  installed: تم التثبيت.
+  new_profile_chip: + ملف شخصي جديد
+  created_on_install: تم إنشاؤه أثناء التثبيت باستخدام أيقونة هذا التعديل
+  optional: " (اختياري)"
+  dep_label: "%{name} v%{version}%{optional}"
+  dep_detail: "%{id} — قيد الإصدار %{constraint}"
+  dep_already_installed: "%{detail} — مثبت بالفعل"
+  unresolved: "تعذّر حلّ %{count} من الاعتماديات وسيتم تخطيها: %{list}"
+  install_into: تثبيت في الملف الشخصي
+  version: الإصدار
+  dependencies: الاعتماديات
+  install: تثبيت
+
+lobbies:
+  dialog_title: "التشغيل في الغرفة %{code}"
+  launching: جارٍ التشغيل...
+  launch: تشغيل
+  code_copied: "تم نسخ الرمز %{code} إلى الحافظة. "
+  code_copied_notice: تم نسخ الرمز إلى الحافظة.
+  copy_code: نسخ رمز الانضمام
+  regions_unavailable: "%{reason} أضف منطقة في تبويب الخوادم لتصفح غرفها."
+  regions_unavailable_title: تعذّر قراءة مناطق Among Us الخاصة بك
+  empty: لم يتم العثور على غرف مفتوحة. تظهر هنا فقط الخوادم التي تنشر قائمة بالغرف.
+  unknown_host: مضيف غير معروف
+  modded_profile: ملف شخصي مُعدّل
+  bepinex_will_install: سيتم تثبيت BepInEx
+  temporary_profile: ملف شخصي مؤقت
+  temporary_profile_subtitle: ملف شخصي جديد تماماً، يُحذف تلقائياً عند إغلاق اللعبة
+  region: "المنطقة: %{region}"
+  profile: الملف الشخصي
+  no_mods_required: لا توجد تعديلات مطلوبة.
+  required_mods: التعديلات المطلوبة
+  refreshing: جارٍ التحديث...
+  description: الألعاب المفتوحة في المناطق المفعّلة لديك والتي تنشر قائمة عامة بالغرف. شغّل اللعبة ثم الصق الرمز المنسوخ داخل اللعبة.
+  active: الغرف النشطة
+  all_installed: جميع التعديلات المطلوبة مثبتة بالفعل
+  will_install: "سيتم التثبيت: %{names}"
+  more: "، و%{count} أخرى"
+  checking: "جارٍ التحقق من %{count} تعديل..."
+  not_in_catalog: "%{count} من التعديلات غير موجودة في الكتالوج (سيتم تخطيها)"
+  unknown_map: خريطة غير معروفة
+  unknown_mod: تعديل غير معروف
+  unknown_mod_version: "إصدار التعديل %{version} غير معروف"
+  profile_gone: الملف الشخصي المحدد لم يعد موجوداً
+  profile_gone_launch: اختفى الملف الشخصي قبل بدء التشغيل
+  launched_region_set: تم التشغيل مع ضبط المنطقة على منطقة هذه الغرفة.
+  launched: تم التشغيل.
+  skipped_catalog: " تم تخطي %{count} من التعديلات المطلوبة لعدم وجودها في الكتالوج."
+  skipped_failed: " تم تخطي %{count} من التعديلات لفشل تثبيتها."
+
+servers:
+  added: 'تمت إضافة المنطقة "%{name}"'
+  already_added: 'المنطقة "%{name}" مضافة بالفعل'
+  saved: 'تم حفظ المنطقة "%{name}"'
+  my_server: خادمي
+  edit_title: تعديل الخادم
+  add_title: إضافة خادم مخصص
+  name: الاسم
+  address: العنوان
+  port: المنفذ
+  use_dtls: استخدام DTLS
+  add: إضافة
+  add_custom: إضافة خادم مخصص
+  name_address_required: الاسم والعنوان مطلوبان.
+  port_invalid: يجب أن يكون المنفذ رقماً بين 1 و65535.
+  conflict: '"%{name}" يشير بالفعل إلى ذلك العنوان والمنفذ.'
+  address_exists: توجد منطقة لهذا العنوان بالفعل.
+  regioninfo_unreadable: تعذّر قراءة regionInfo.json.
+  no_regions: لا توجد مناطق مهيأة بعد. أضف واحدة أدناه.
+  edit_tooltip: تعديل هذا الخادم
+  remove_tooltip: إزالة هذا الخادم
+  load_failed: "فشل تحميل الخوادم: %{error}"
+  none_available: لا توجد خوادم متاحة.
+  all_added: تمت إضافة جميع الخوادم المتاحة.
+  by_address: "بواسطة %{owner} · %{address}:%{port}"
+  description: أضف خوادم المجتمع كمناطق في Among Us. أعد تشغيل اللعبة لتطبيق التغييرات.
+  installed_regions: المناطق المثبتة
+  available: الخوادم المتاحة
+
+profile:
+  fallback_title: ملف شخصي
+  this_profile: هذا الملف الشخصي
+  not_found: لم يتم العثور على الملف الشخصي
+  bepinex_not_installed: BepInEx غير مثبت
+  bepinex_incompatible: "نسخة BepInEx هذه غير متوافقة مع %{platform}"
+  install_bepinex: تثبيت BepInEx
+  instances_running: "هناك %{count} نسخة قيد التشغيل"
+  launch_another: تشغيل نسخة أخرى
+  open_folder: فتح المجلد
+  export_zip: تصدير ZIP
+  desktop_shortcut: اختصار سطح المكتب
+  exporting: "جارٍ التصدير... %{percent}%"
+  exported: "تم تصدير الملف الشخصي إلى %{dest}"
+  export_failed: "فشل التصدير: %{error}"
+  shortcut_created: "تم إنشاء الاختصار في %{path}"
+  shortcut_failed: "فشل إنشاء الاختصار: %{error}"
+  rename_title: إعادة تسمية الملف الشخصي
+  rename_failed: "فشلت إعادة التسمية: %{error}"
+  delete_title: حذف الملف الشخصي
+  delete_desc: 'حذف "%{name}"؟ سيتم حذف تعديلاته وسجلاته من القرص. لا يمكن التراجع عن ذلك.'
+  delete_failed: "فشل الحذف: %{error}"
+  delete_profile: حذف الملف الشخصي
+  delete_this_profile: حذف هذا الملف الشخصي
+  delete_this_profile_desc: يزيل الملف الشخصي وتعديلاته وسجلاته من القرص. لا يمكن التراجع عن ذلك.
+  danger_zone: منطقة الخطر
+  remove_mod_title: إزالة التعديل
+  remove_mod_desc: 'إزالة "%{name}" من هذا الملف الشخصي؟ سيتم حذف ملفاته من القرص.'
+  remove: إزالة
+  remove_mod_failed: "فشلت إزالة التعديل: %{error}"
+  toggle_failed: "فشل التبديل: %{error}"
+  add_dll_prompt: إضافة إضافة BepInEx (.dll)
+  drop_dll: أسقط ملف تعديل .dll لإضافته إلى هذا الملف الشخصي
+  drop_zip: استورد ملفات .zip الخاصة بالملفات الشخصية من صفحة المكتبة
+  added: "تمت إضافة %{names}"
+  custom_mod: مخصص
+  no_mods: لا توجد تعديلات مثبتة. ثبّت التعديلات من الاستكشاف، أو أسقط إضافة BepInEx بصيغة .dll هنا.
+  mods_heading: "التعديلات · %{count}"
+  install_mods: تثبيت التعديلات
+  add_dll: إضافة DLL
+
+icon:
+  title: تعديل أيقونة الملف الشخصي
+  choose_image_prompt: اختر صورة للأيقونة
+  image_empty: الصورة المحددة فارغة
+  image_read_failed: "فشل قراءة الصورة: %{error}"
+  choose_custom: اختر صورة للأيقونة المخصصة
+  select_mod: اختر أيقونة تعديل مُثبّت
+  update_failed: "فشل تحديث الأيقونة: %{error}"
+  tab_default: الافتراضية
+  tab_custom: صورة مخصصة
+  tab_mod: تعديل مثبت
+  default_desc: استخدام أيقونة الملف الشخصي الافتراضية.
+  image_ready: الصورة الجديدة جاهزة للحفظ.
+  using_existing: يتم استخدام الصورة المخصصة الحالية. اختر صورة جديدة لاستبدالها.
+  formats: PNG أو JPG أو WEBP أو GIF أو BMP أو AVIF.
+  change_image: تغيير الصورة
+  choose_image: اختيار صورة
+  no_mods: لا توجد تعديلات مثبتة. أضف تعديلاً لاستخدام أيقونته.
+
+notify:
+  among_us_detected: "تم العثور على Among Us في %{path}"
+  among_us_not_found: "تعذّر العثور على Among Us تلقائياً — حدّد مجلده من الإعدادات ← اللعبة قبل التشغيل."
+
+migrate:
+  offer: "تم العثور على %{count} من الملفات الشخصية من إصدار Starlight السابق. هل تريد ترحيلها إلى هذا التثبيت؟"
+  title: ترحيل الملفات الشخصية
+  action: ترحيل
+  done: "تم ترحيل %{count} من الملفات الشخصية"
+  failed: "فشل الترحيل: %{error}"
+
+titlebar:
+  stop_count: "إيقاف (%{count})"
+  launch: "تشغيل %{name}"
+  launch_failed: "فشل التشغيل: %{error}"
+  stop_failed: "فشل الإيقاف: %{error}"
+
+update:
+  available: "يتوفر Starlight %{version}."
+  title: يتوفر تحديث
+  restart: إعادة التشغيل والتحديث
+  failed: "فشل التحديث: %{error}"
+
+settings:
+  page:
+    game: اللعبة
+    launch: التشغيل
+    appearance: المظهر
+    bepinex: BepInEx
+    linux: بيئة تشغيل Linux
+    about: حول
+
+  group:
+    installation: التثبيت
+    platform: المنصة
+    behavior: السلوك
+    theme: السمة
+    cache: ذاكرة التخزين المؤقت
+    download_urls: عناوين التنزيل
+    runner: المشغّل
+    runner_desc: 'يتم تشغيل Steam عبر عميل Steam (يجب أن يكون Steam قيد التشغيل). وللتشغيل مع التعديلات، اضبط خيارات تشغيل Steam الخاصة باللعبة على WINEDLLOVERRIDES="winhttp=n,b" %command%.'
+
+  among_us_path: مسار Among Us
+  among_us_path_desc: المجلد الذي يحتوي على Among Us.exe.
+  auto_detect: اكتشاف تلقائي
+  auto_detect_among_us: اكتشاف Among Us تلقائياً
+  auto_detect_desc: البحث في مواقع التثبيت المعروفة وتعيين المسار أعلاه.
+  game_platform: منصة اللعبة
+  game_platform_desc: المتجر الذي تم تثبيت اللعبة منه.
+  close_on_launch: إغلاق Starlight عند تشغيل اللعبة
+  close_on_launch_desc: إنهاء التطبيق بعد بدء تشغيل اللعبة.
+  multi_instance: السماح بتشغيل عدة نسخ
+  multi_instance_desc: "السماح بتشغيل أكثر من نافذة لعبة واحدة في الوقت نفسه. تعمل النسخ الإضافية من نسخة مؤقتة من الملف الشخصي، بحيث يمكنها البدء فوراً دون التعارض على ملفات BepInEx."
+  theme: السمة
+  theme_desc: أسقط ملفات JSON الخاصة بسمات gpui-component في مجلد السمات لإضافة سماتك الخاصة.
+  language: اللغة
+  language_desc: لغة واجهة Starlight ومكوناته.
+  themes_folder: مجلد السمات
+  open_themes_folder: فتح مجلد السمات
+  browse_themes: استعراض السمات
+  themes_folder_desc: تُعاد كتابة سمات Starlight المضمّنة عند كل تشغيل، لذا انسخ إحداها إلى ملف جديد قبل تعديلها.
+  stars_background: خلفية نجوم عائمة
+  stars_background_desc: عرض حقل النجوم البطيء الحركة خلف الصفحات.
+  cache_downloads: تخزين تنزيلات BepInEx مؤقتاً
+  cache_downloads_desc: إعادة استخدام الأرشيفات المخزنة مؤقتاً بين عمليات تثبيت الملفات الشخصية.
+  cache:
+    x64: ذاكرة x64 المؤقتة
+    x86: ذاكرة x86 المؤقتة
+    cached: "مخزّن مؤقتاً · %{size}"
+    not_cached: غير مخزّن مؤقتاً
+    path_unavailable: مسار ذاكرة التخزين المؤقت غير متاح
+    download: تنزيل
+    downloaded: "تم تنزيل BepInEx %{arch}"
+    download_failed: "فشل تنزيل BepInEx %{arch}: %{error}"
+    cleared: "تم مسح ذاكرة BepInEx %{arch} المؤقتة"
+    clear_failed: "فشل المسح: %{error}"
+    path_error: "مسار ذاكرة التخزين المؤقت: %{error}"
+
+  bepinex_x64_url: عنوان URL لـ BepInEx x64
+  bepinex_x86_url: عنوان URL لـ BepInEx x86
+  download_urls_desc: تجاوز مواقع أرشيفات الإصدارات الافتراضية.
+  detected: "تم العثور على Among Us في %{path}"
+  detected_store: "تم العثور على Among Us (%{store}) في %{path}"
+  not_detected: تعذّر اكتشاف تثبيت Among Us تلقائياً
+  detection_failed: "فشل الاكتشاف: %{error}"
+
+  linux:
+    detected: تم اكتشاف بيئة تشغيل Linux
+    auto_detect: اكتشاف بيئة تشغيل Linux تلقائياً
+    auto_detect_desc: البحث في Steam/Proton + مسارات Wine من مسار Among Us.
+    runner: المشغّل
+    runner_desc: 'يتم تشغيل Steam عبر عميل Steam (يجب أن يكون Steam قيد التشغيل). وللتشغيل مع التعديلات، اضبط خيارات تشغيل Steam الخاصة باللعبة على WINEDLLOVERRIDES="winhttp=n,b" %command%.'
+    runner_binary: ملف المشغّل التنفيذي
+    wine_prefix: مسار Wine Prefix
+    region_info_path: مسار RegionInfo.json
+    region_info_desc: "ملف RegionInfo.json الخاص بـ Among Us داخل Wine Prefix، والمستخدم لإدارة الخوادم. اتركه فارغاً لاشتقاقه من Wine Prefix (drive_c/users/<your user>/AppData/LocalLow/Innersloth/Among Us)."
+    proton_compat: مسار بيانات توافق Proton
+    proton_compat_desc: مجلد Steam compatdata الخاص باللعبة (steamapps/compatdata/945360). ويُستخدم أيضاً لتحديد موقع RegionInfo.json لإدارة الخوادم.
+    steam_run: تشغيل Proton عبر steam-run
+    steam_run_desc: تشغيل Proton عبر steam-run (لأنظمة NixOS/الأنظمة غير FHS). عطّل هذا الخيار لتشغيل ملف Proton التنفيذي مباشرةً.
+
+  license: رخصة GNU GPLv3
+  view_source: عرض المصدر
+  open_data_folder: فتح مجلد البيانات
+  path:
+    select_folder: تحديد مجلد
+    select_file: تحديد ملف
+    browse: استعراض
