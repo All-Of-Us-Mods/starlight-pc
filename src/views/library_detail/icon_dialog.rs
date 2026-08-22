@@ -3,7 +3,6 @@
 //! window's dialog layer while `icon_dialog` is `Some`.
 
 use gpui::*;
-use rust_i18n::t;
 use gpui_component::alert::Alert;
 use gpui_component::avatar::Avatar;
 use gpui_component::button::{Button, ButtonVariants};
@@ -11,6 +10,7 @@ use gpui_component::dialog::{DialogAction, DialogClose, DialogFooter};
 use gpui_component::radio::Radio;
 use gpui_component::tab::TabBar;
 use gpui_component::{Icon, IconName, Sizable as _, WindowExt};
+use rust_i18n::t;
 
 use super::{LibraryDetailView, LoadState};
 use crate::backend::api;
@@ -71,12 +71,16 @@ impl LibraryDetailView {
                 .footer(
                     DialogFooter::new()
                         .child(
-                            DialogClose::new()
-                                .child(Button::new("icon-dialog-cancel").label(t!("common.cancel"))),
+                            DialogClose::new().child(
+                                Button::new("icon-dialog-cancel").label(t!("common.cancel")),
+                            ),
                         )
                         .child(
-                            DialogAction::new()
-                                .child(Button::new("icon-dialog-save").primary().label(t!("common.save"))),
+                            DialogAction::new().child(
+                                Button::new("icon-dialog-save")
+                                    .primary()
+                                    .label(t!("common.save")),
+                            ),
                         ),
                 )
                 // Saving is asynchronous (and can fail validation), so the
@@ -144,7 +148,9 @@ impl LibraryDetailView {
                             state.error = None;
                         }
                         Ok(_) => state.error = Some(t!("icon.image_empty").to_string()),
-                        Err(e) => state.error = Some(t!("icon.image_read_failed", error = e).to_string()),
+                        Err(e) => {
+                            state.error = Some(t!("icon.image_read_failed", error = e).to_string())
+                        }
                     }
                     cx.notify();
                 }

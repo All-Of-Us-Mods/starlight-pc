@@ -22,6 +22,7 @@ common:
   unknown: غير معروف
   never: أبداً
   failed: "فشل: %{error}"
+  by_author: "بواسطة %{author}"
 
 time:
   hours_minutes: "%{hours}س %{minutes}د"
@@ -31,7 +32,6 @@ time:
 home:
   news: الأخبار
   trending: التعديلات الرائجة
-  by_author: "بواسطة %{author}"
 
 news:
   unknown_date: تاريخ غير معروف
@@ -173,6 +173,7 @@ servers:
 
 profile:
   fallback_title: ملف شخصي
+  played: "%{time} من اللعب"
   this_profile: هذا الملف الشخصي
   not_found: لم يتم العثور على الملف الشخصي
   bepinex_not_installed: BepInEx غير مثبت
@@ -231,6 +232,9 @@ icon:
   choose_image: اختيار صورة
   no_mods: لا توجد تعديلات مثبتة. أضف تعديلاً لاستخدام أيقونته.
 
+linux:
+  wine_prefix_hint: حدّد مسار Wine Prefix أو مسار RegionInfo.json من الإعدادات ← بيئة تشغيل Linux
+  proton_compat_hint: حدّد مسار بيانات توافق Proton من الإعدادات ← بيئة تشغيل Linux (يمكن للاكتشاف التلقائي إيجاده)
 notify:
   among_us_detected: "تم العثور على Among Us في %{path}"
   among_us_not_found: "تعذّر العثور على Among Us تلقائياً — حدّد مجلده من الإعدادات ← اللعبة قبل التشغيل."
@@ -241,6 +245,19 @@ migrate:
   action: ترحيل
   done: "تم ترحيل %{count} من الملفات الشخصية"
   failed: "فشل الترحيل: %{error}"
+
+log:
+  latest: أحدث سجل
+  filter: تصفية السجل...
+  copy: نسخ السجل المُصفّى
+  lines: "%{kept} / %{total} سطر"
+  level:
+    error: خطأ
+    warning: تحذير
+    info: معلومات
+    message: رسالة
+    debug: تصحيح
+    other: أخرى
 
 titlebar:
   stop_count: "إيقاف (%{count})"

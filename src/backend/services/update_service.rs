@@ -56,10 +56,8 @@ fn parse_sha256_digest(digest: &str) -> Option<String> {
 pub fn check_for_update() -> AppResult<Option<UpdateInfo>> {
     info!("checking for updates against {RELEASES_API_URL}");
 
-    let client = crate::backend::services::http_download::http_client(
-        REQUEST_TIMEOUT,
-        REQUEST_TIMEOUT,
-    )?;
+    let client =
+        crate::backend::services::http_download::http_client(REQUEST_TIMEOUT, REQUEST_TIMEOUT)?;
 
     let release: GithubRelease = client
         .get(RELEASES_API_URL)

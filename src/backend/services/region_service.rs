@@ -160,7 +160,7 @@ fn region_info_path() -> AppResult<PathBuf> {
             let prefix = settings.linux_wine_prefix.trim();
             if prefix.is_empty() {
                 return Err(AppError::state(
-                    "Set the Wine prefix or RegionInfo.json path in Settings → Linux runtime",
+                    rust_i18n::t!("linux.wine_prefix_hint").to_string(),
                 ));
             }
             Ok(region_info_in(wine_user_dir(&expand_tilde(prefix))?))
@@ -169,8 +169,7 @@ fn region_info_path() -> AppResult<PathBuf> {
             let compat = settings.linux_proton_compat_data_path.trim();
             if compat.is_empty() {
                 return Err(AppError::state(
-                    "Set the Proton compat data path in Settings → Linux runtime \
-                     (Auto-detect can find it)",
+                    rust_i18n::t!("linux.proton_compat_hint").to_string(),
                 ));
             }
             Ok(region_info_in(

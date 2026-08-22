@@ -21,6 +21,7 @@ common:
   unknown: Unknown
   never: Never
   failed: "Failed: %{error}"
+  by_author: "by %{author}"
 time:
   hours_minutes: "%{hours}h %{minutes}m"
   minutes: "%{minutes} min"
@@ -28,7 +29,6 @@ time:
 home:
   news: News
   trending: Trending Mods
-  by_author: "by %{author}"
 news:
   unknown_date: Unknown date
   posted_by: "Posted by %{author}"
@@ -163,6 +163,7 @@ servers:
   available: Available servers
 profile:
   fallback_title: Profile
+  played: "%{time} played"
   this_profile: this profile
   not_found: Profile not found
   bepinex_not_installed: BepInEx not installed
@@ -219,6 +220,9 @@ icon:
   change_image: Change Image
   choose_image: Choose Image
   no_mods: No mods installed. Add a mod to use its icon.
+linux:
+  wine_prefix_hint: Set the Wine prefix or RegionInfo.json path in Settings → Linux runtime
+  proton_compat_hint: Set the Proton compat data path in Settings → Linux runtime (Auto-detect can find it)
 notify:
   among_us_detected: "Among Us detected at %{path}"
   among_us_not_found: "Couldn't find Among Us automatically — set its folder in Settings → Game before launching."
@@ -228,6 +232,18 @@ migrate:
   action: Migrate
   done: "Migrated %{count} profile(s)"
   failed: "Migration failed: %{error}"
+log:
+  latest: Latest log
+  filter: Filter log…
+  copy: Copy the filtered log
+  lines: "%{kept} / %{total} lines"
+  level:
+    error: Error
+    warning: Warning
+    info: Info
+    message: Message
+    debug: Debug
+    other: Other
 titlebar:
   stop_count: "Stop (%{count})"
   launch: "Launch %{name}"

@@ -1,8 +1,8 @@
 use chrono::{DateTime, Local};
 use gpui::*;
-use rust_i18n::t;
 use gpui_component::separator::Separator;
 use gpui_component::text::TextView;
+use rust_i18n::t;
 
 use crate::backend::api::Post;
 use crate::theme::ThemeExt;

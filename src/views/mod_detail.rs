@@ -340,7 +340,10 @@ impl ModDetailView {
                 Some(name)
             }
             (None, None) => {
-                window.push_notification(Notification::warning(t!("mod.pick_profile").to_string()), cx);
+                window.push_notification(
+                    Notification::warning(t!("mod.pick_profile").to_string()),
+                    cx,
+                );
                 return;
             }
         };
@@ -605,10 +608,11 @@ impl Render for ModDetailView {
                         .child(Skeleton::new().w_3_4().h_3().rounded_md()),
                 )
                 .into_any_element(),
-            LoadState::Failed(e) => {
-                Alert::error("mod-load-failed", t!("common.failed", error = e).to_string())
-                    .into_any_element()
-            }
+            LoadState::Failed(e) => Alert::error(
+                "mod-load-failed",
+                t!("common.failed", error = e).to_string(),
+            )
+            .into_any_element(),
             LoadState::Loaded(data) => {
                 let m = &data.mod_info;
                 let latest_version_label = data
@@ -664,7 +668,7 @@ impl Render for ModDetailView {
                                 div()
                                     .text_sm()
                                     .text_color(theme.text_muted)
-                                    .child(t!("home.by_author", author = m.author).to_string()),
+                                    .child(t!("common.by_author", author = m.author).to_string()),
                             ),
                     )
                     .child(div().flex().justify_center().child(install_button))
@@ -677,8 +681,12 @@ impl Render for ModDetailView {
                             .text_sm()
                             .gap_4()
                             .text_color(theme.text_muted)
-                            .child(t!("mod.downloads", count = format_count(m.downloads)).to_string())
-                            .child(t!("mod.updated", date = format::date_ms(m.updated_at)).to_string())
+                            .child(
+                                t!("mod.downloads", count = format_count(m.downloads)).to_string(),
+                            )
+                            .child(
+                                t!("mod.updated", date = format::date_ms(m.updated_at)).to_string(),
+                            )
                             .children(
                                 m.mod_type
                                     .clone()
@@ -818,9 +826,9 @@ fn render_install_panel(
                     // panel's dependency state half-updated.
                     Button::new("install-retry")
                         .label(t!("common.retry"))
-                        .on_click(cx.listener(|this, _, _window, cx| {
-                            this.retry_install_resolve(cx)
-                        })),
+                        .on_click(
+                            cx.listener(|this, _, _window, cx| this.retry_install_resolve(cx)),
+                        ),
                 )
                 .into_any_element(),
         ),
@@ -980,11 +988,16 @@ fn render_install_panel(
         .children(if panel.unresolved.is_empty() {
             None
         } else {
-            Some(div().text_xs().text_color(theme.text_muted).child(t!(
-                "mod.unresolved",
-                count = panel.unresolved.len(),
-                list = panel.unresolved.join(", "),
-            ).to_string()))
+            Some(
+                div().text_xs().text_color(theme.text_muted).child(
+                    t!(
+                        "mod.unresolved",
+                        count = panel.unresolved.len(),
+                        list = panel.unresolved.join(", "),
+                    )
+                    .to_string(),
+                ),
+            )
         })
         .children(status_row)
         .child(

@@ -615,12 +615,7 @@ impl LobbiesView {
             game.player_count.unwrap_or(0),
             game.max_players.unwrap_or(0)
         );
-        let meta_line = [
-            players,
-            map_name(game.map_id),
-            row.region_label.clone(),
-        ]
-        .join(" · ");
+        let meta_line = [players, map_name(game.map_id), row.region_label.clone()].join(" · ");
 
         let is_open = game.status.as_deref() == Some("Lobby");
         let status_text = game
@@ -925,7 +920,12 @@ impl Render for LobbiesView {
                             .flex()
                             .items_center()
                             .gap_2()
-                            .child(div().text_2xl().font_weight(FontWeight::BOLD).child(t!("nav.lobbies")))
+                            .child(
+                                div()
+                                    .text_2xl()
+                                    .font_weight(FontWeight::BOLD)
+                                    .child(t!("nav.lobbies")),
+                            )
                             .when(self.refreshing, |s| {
                                 s.child(
                                     div()
@@ -988,7 +988,9 @@ fn render_mod_chip(lobby_mod: &LobbyMod, theme: &Theme) -> AnyElement {
         (_, Some(info), None) => info.name.clone(),
         (Some(id), None, Some(version)) => format!("{id} {version}"),
         (Some(id), None, None) => id.to_string(),
-        (None, _, Some(version)) => t!("lobbies.unknown_mod_version", version = version).to_string(),
+        (None, _, Some(version)) => {
+            t!("lobbies.unknown_mod_version", version = version).to_string()
+        }
         (None, _, None) => t!("lobbies.unknown_mod").to_string(),
     };
 
@@ -1078,10 +1080,7 @@ fn preview_mod_installs(required: &[LobbyMod], installed: &[ProfileModEntry]) ->
 /// it in (the theme's success color when nothing needs to change).
 fn install_summary(preview: &ModInstallPreview, theme: &Theme) -> (String, Hsla) {
     if preview.fully_satisfied() && preview.unavailable == 0 {
-        return (
-            t!("lobbies.all_installed").to_string(),
-            theme.success,
-        );
+        return (t!("lobbies.all_installed").to_string(), theme.success);
     }
     let mut parts = Vec::new();
     if !preview.to_install.is_empty() {

@@ -153,7 +153,7 @@ fn news_card(post: &Post, theme: &crate::theme::Theme, cx: &mut Context<HomeView
             div()
                 .text_xs()
                 .text_color(theme.text_muted)
-                .child(t!("home.by_author", author = post.author).to_string()),
+                .child(t!("common.by_author", author = post.author).to_string()),
         )
         .child(
             div()
@@ -222,7 +222,12 @@ impl Render for HomeView {
         crate::views::page_root("home-page", &theme)
             .overflow_y_scroll()
             .gap_8()
-            .child(div().text_2xl().font_weight(FontWeight::BOLD).child(t!("nav.home")))
+            .child(
+                div()
+                    .text_2xl()
+                    .font_weight(FontWeight::BOLD)
+                    .child(t!("nav.home")),
+            )
             .child(
                 div()
                     .flex()
