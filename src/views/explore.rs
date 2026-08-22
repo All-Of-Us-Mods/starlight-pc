@@ -372,7 +372,12 @@ impl Render for ExploreView {
             .items_center()
             .gap_3()
             .flex_none()
-            .child(div().text_sm().text_color(theme.text_muted).child(t!("explore.type_label")))
+            .child(
+                div()
+                    .text_sm()
+                    .text_color(theme.text_muted)
+                    .child(t!("explore.type_label")),
+            )
             .child(self.type_pill("type-all", TypeFilter::All, cx))
             .child(self.type_pill("type-all-clients", TypeFilter::AllClients, cx))
             .child(self.type_pill("type-client-only", TypeFilter::ClientOnly, cx))

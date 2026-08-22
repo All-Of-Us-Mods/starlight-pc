@@ -163,6 +163,7 @@ servers:
   available: Available servers
 profile:
   fallback_title: Profile
+  played: "%{time} played"
   this_profile: this profile
   not_found: Profile not found
   bepinex_not_installed: BepInEx not installed
@@ -228,6 +229,18 @@ migrate:
   action: Migrate
   done: "Migrated %{count} profile(s)"
   failed: "Migration failed: %{error}"
+log:
+  latest: Latest log
+  filter: Filter log…
+  copy: Copy the filtered log
+  lines: "%{kept} / %{total} lines"
+  level:
+    error: Error
+    warning: Warning
+    info: Info
+    message: Message
+    debug: Debug
+    other: Other
 titlebar:
   stop_count: "Stop (%{count})"
   launch: "Launch %{name}"

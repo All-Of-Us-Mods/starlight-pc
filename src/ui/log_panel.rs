@@ -10,6 +10,7 @@ use gpui_component::Sizable as _;
 use gpui_component::button::{Toggle, ToggleVariants as _};
 use gpui_component::clipboard::Clipboard;
 use gpui_component::input::{Editor, EditorState, Input, InputEvent, InputState};
+use rust_i18n::t;
 
 use crate::theme::ThemeExt;
 
@@ -42,15 +43,16 @@ impl LogLevel {
         }
     }
 
-    fn label(self) -> &'static str {
+    fn label(self) -> String {
         match self {
-            Self::Error => "Error",
-            Self::Warning => "Warning",
-            Self::Info => "Info",
-            Self::Message => "Message",
-            Self::Debug => "Debug",
-            Self::Other => "Other",
+            Self::Error => t!("log.level.error"),
+            Self::Warning => t!("log.level.warning"),
+            Self::Info => t!("log.level.info"),
+            Self::Message => t!("log.level.message"),
+            Self::Debug => t!("log.level.debug"),
+            Self::Other => t!("log.level.other"),
         }
+        .to_string()
     }
 
     fn chip_id(self) -> &'static str {
@@ -134,7 +136,8 @@ pub struct LogPanel {
 
 impl LogPanel {
     pub fn new(window: &mut Window, cx: &mut Context<Self>) -> Self {
-        let filter_input = cx.new(|cx| InputState::new(window, cx).placeholder("Filter log…"));
+        let filter_input =
+            cx.new(|cx| InputState::new(window, cx).placeholder(t!("log.filter").to_string()));
         cx.subscribe(&filter_input, |this, state, event: &InputEvent, cx| {
             if matches!(event, InputEvent::Change) {
                 this.query = state.read(cx).value().to_string();
@@ -244,12 +247,11 @@ impl Render for LogPanel {
                         div()
                             .text_sm()
                             .font_weight(FontWeight::SEMIBOLD)
-                            .child("Latest log"),
+                            .child(t!("log.latest").to_string()),
                     )
-                    .child(div().text_xs().text_color(theme.text_muted).child(format!(
-                        "{kept_count} / {total_count} line{}",
-                        if total_count == 1 { "" } else { "s" }
-                    ))),
+                    .child(div().text_xs().text_color(theme.text_muted).child(
+                        t!("log.lines", kept = kept_count, total = total_count).to_string(),
+                    )),
             )
             .child(
                 div()
@@ -262,7 +264,7 @@ impl Render for LogPanel {
                     .child(
                         Clipboard::new("copy-log")
                             .value(lines_for_copy)
-                            .tooltip("Copy the filtered log"),
+                            .tooltip(t!("log.copy").to_string()),
                     ),
             )
             .child(

@@ -222,7 +222,12 @@ impl Render for HomeView {
         crate::views::page_root("home-page", &theme)
             .overflow_y_scroll()
             .gap_8()
-            .child(div().text_2xl().font_weight(FontWeight::BOLD).child(t!("nav.home")))
+            .child(
+                div()
+                    .text_2xl()
+                    .font_weight(FontWeight::BOLD)
+                    .child(t!("nav.home")),
+            )
             .child(
                 div()
                     .flex()

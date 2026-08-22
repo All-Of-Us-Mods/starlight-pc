@@ -285,7 +285,9 @@ impl Workspace {
                         },
                     );
                     window.push_notification(
-                        Notification::success(t!("notify.among_us_detected", path = path).to_string()),
+                        Notification::success(
+                            t!("notify.among_us_detected", path = path).to_string(),
+                        ),
                         cx,
                     );
                 }
@@ -330,22 +332,20 @@ impl Workspace {
                 return;
             }
             let _ = window_handle.update(cx, |_, window, cx| {
-                let notification = Notification::info(t!(
-                    "migrate.offer",
-                    count = pending,
-                ).to_string())
-                .title(t!("migrate.title"))
-                .autohide(false)
-                .action(move |_, _window, cx| {
-                    let library = library.clone();
-                    Button::new("migrate-profiles")
-                        .primary()
-                        .label(t!("migrate.action"))
-                        .on_click(cx.listener(move |this, _, window, cx| {
-                            Self::run_legacy_migration(library.clone(), window, cx);
-                            this.dismiss(window, cx);
-                        }))
-                });
+                let notification =
+                    Notification::info(t!("migrate.offer", count = pending,).to_string())
+                        .title(t!("migrate.title"))
+                        .autohide(false)
+                        .action(move |_, _window, cx| {
+                            let library = library.clone();
+                            Button::new("migrate-profiles")
+                                .primary()
+                                .label(t!("migrate.action"))
+                                .on_click(cx.listener(move |this, _, window, cx| {
+                                    Self::run_legacy_migration(library.clone(), window, cx);
+                                    this.dismiss(window, cx);
+                                }))
+                        });
                 window.push_notification(notification, cx);
             });
         })

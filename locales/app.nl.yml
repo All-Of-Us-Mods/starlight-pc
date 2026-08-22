@@ -163,6 +163,7 @@ servers:
   available: Beschikbare servers
 profile:
   fallback_title: Profiel
+  played: "%{time} gespeeld"
   this_profile: dit profiel
   not_found: Profiel niet gevonden
   bepinex_not_installed: BepInEx niet geïnstalleerd
@@ -228,6 +229,18 @@ migrate:
   action: Migreren
   done: "%{count} profiel/profielen gemigreerd"
   failed: "Migratie mislukt: %{error}"
+log:
+  latest: Laatste log
+  filter: Log filteren…
+  copy: De gefilterde log kopiëren
+  lines: "%{kept} / %{total} regels"
+  level:
+    error: Fout
+    warning: Waarschuwing
+    info: Info
+    message: Bericht
+    debug: Debug
+    other: Overig
 titlebar:
   stop_count: "Stoppen (%{count})"
   launch: "%{name} starten"

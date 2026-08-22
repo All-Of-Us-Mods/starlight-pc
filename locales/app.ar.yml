@@ -173,6 +173,7 @@ servers:
 
 profile:
   fallback_title: ملف شخصي
+  played: "%{time} من اللعب"
   this_profile: هذا الملف الشخصي
   not_found: لم يتم العثور على الملف الشخصي
   bepinex_not_installed: BepInEx غير مثبت
@@ -241,6 +242,19 @@ migrate:
   action: ترحيل
   done: "تم ترحيل %{count} من الملفات الشخصية"
   failed: "فشل الترحيل: %{error}"
+
+log:
+  latest: أحدث سجل
+  filter: تصفية السجل...
+  copy: نسخ السجل المُصفّى
+  lines: "%{kept} / %{total} سطر"
+  level:
+    error: خطأ
+    warning: تحذير
+    info: معلومات
+    message: رسالة
+    debug: تصحيح
+    other: أخرى
 
 titlebar:
   stop_count: "إيقاف (%{count})"

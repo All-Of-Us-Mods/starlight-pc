@@ -309,9 +309,21 @@ impl ServersView {
                 .w(px(420.0))
                 .child(
                     v_form()
-                        .child(field().label(t!("servers.name").to_string()).child(Input::new(&name)))
-                        .child(field().label(t!("servers.address").to_string()).child(Input::new(&address)))
-                        .child(field().label(t!("servers.port").to_string()).child(Input::new(&port)))
+                        .child(
+                            field()
+                                .label(t!("servers.name").to_string())
+                                .child(Input::new(&name)),
+                        )
+                        .child(
+                            field()
+                                .label(t!("servers.address").to_string())
+                                .child(Input::new(&address)),
+                        )
+                        .child(
+                            field()
+                                .label(t!("servers.port").to_string())
+                                .child(Input::new(&port)),
+                        )
                         .child(
                             field().child(
                                 Checkbox::new("custom-dtls")
@@ -430,9 +442,7 @@ impl ServersView {
                     Ok((name, true)) => {
                         this.notice = Some(t!("servers.added", name = name).to_string())
                     }
-                    Ok((_, false)) => {
-                        this.notice = Some(t!("servers.address_exists").to_string())
-                    }
+                    Ok((_, false)) => this.notice = Some(t!("servers.address_exists").to_string()),
                     Err(e) => {
                         warn!("add custom region failed: {e}");
                         this.error = Some(e.to_string());
@@ -472,9 +482,7 @@ impl ServersView {
                 .await;
             let _ = this.update(cx, |this, cx| {
                 match result {
-                    Ok(name) => {
-                        this.notice = Some(t!("servers.saved", name = name).to_string())
-                    }
+                    Ok(name) => this.notice = Some(t!("servers.saved", name = name).to_string()),
                     Err(e) => {
                         warn!("update region failed: {e}");
                         this.error = Some(e.to_string());
@@ -667,13 +675,15 @@ impl ServersView {
                                         .truncate()
                                         .text_xs()
                                         .text_color(theme.text_muted)
-                                        .child(t!(
-                                            "servers.by_address",
-                                            owner = server.owner,
-                                            address = server.address,
-                                            port = server.port,
-                                        )
-                                        .to_string()),
+                                        .child(
+                                            t!(
+                                                "servers.by_address",
+                                                owner = server.owner,
+                                                address = server.address,
+                                                port = server.port,
+                                            )
+                                            .to_string(),
+                                        ),
                                 ),
                         )
                         .child(
@@ -712,7 +722,12 @@ impl Render for ServersView {
                     .flex()
                     .flex_col()
                     .gap_1()
-                    .child(div().text_2xl().font_weight(FontWeight::BOLD).child(t!("nav.servers")))
+                    .child(
+                        div()
+                            .text_2xl()
+                            .font_weight(FontWeight::BOLD)
+                            .child(t!("nav.servers")),
+                    )
                     .child(
                         div()
                             .text_sm()

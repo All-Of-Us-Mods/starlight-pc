@@ -246,9 +246,6 @@ mod i18n_tests {
             rust_i18n::t!("profile.delete_desc", name = "X"),
             "Delete \"X\"? Its mods and logs are removed from disk. This can't be undone."
         );
-        assert_eq!(
-            rust_i18n::t!("titlebar.launch", name = "Foo"),
-            "Launch Foo"
-        );
+        assert_eq!(rust_i18n::t!("titlebar.launch", name = "Foo"), "Launch Foo");
     }
 }

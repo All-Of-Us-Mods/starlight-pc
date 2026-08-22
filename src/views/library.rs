@@ -502,15 +502,25 @@ impl LibraryView {
                             .text_color(theme.warning)
                             .child(t!("profile.bepinex_not_installed").to_string())
                     }))
-                    .child(div().text_xs().text_color(theme.text_muted).child(t!(
-                        "library.card_stats",
-                        mods = profile.mods.len(),
-                        played = format::play_time(profile.total_play_time),
-                    ).to_string()))
-                    .child(div().text_xs().text_color(theme.text_muted).child(t!(
-                        "library.last_launched",
-                        when = format::last_launched(profile.last_launched_at),
-                    ).to_string())),
+                    .child(
+                        div().text_xs().text_color(theme.text_muted).child(
+                            t!(
+                                "library.card_stats",
+                                mods = profile.mods.len(),
+                                played = format::play_time(profile.total_play_time),
+                            )
+                            .to_string(),
+                        ),
+                    )
+                    .child(
+                        div().text_xs().text_color(theme.text_muted).child(
+                            t!(
+                                "library.last_launched",
+                                when = format::last_launched(profile.last_launched_at),
+                            )
+                            .to_string(),
+                        ),
+                    ),
             )
     }
 }
@@ -627,10 +637,9 @@ impl Render for LibraryView {
                     .flex_col()
                     .gap_1()
                     .child(
-                        div()
-                            .text_sm()
-                            .text_color(theme.text_muted)
-                            .child(t!("library.importing", percent = format!("{p:.0}")).to_string()),
+                        div().text_sm().text_color(theme.text_muted).child(
+                            t!("library.importing", percent = format!("{p:.0}")).to_string(),
+                        ),
                     )
                     .child(Progress::new("import-progress").value(p as f32))
             }))

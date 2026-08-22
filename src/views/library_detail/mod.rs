@@ -337,9 +337,7 @@ impl LibraryDetailView {
             alert
                 .icon(Icon::new(IconName::TriangleAlert).text_color(cx.theme().danger))
                 .title(t!("profile.remove_mod_title"))
-                .description(
-                    t!("profile.remove_mod_desc", name = display).to_string(),
-                )
+                .description(t!("profile.remove_mod_desc", name = display).to_string())
                 .button_props(
                     DialogButtonProps::default()
                         .ok_variant(ButtonVariant::Danger)
@@ -374,7 +372,8 @@ impl LibraryDetailView {
             let _ = this.update(cx, |this, cx| {
                 if let Err(e) = result {
                     warn!("delete mod failed: {e}");
-                    this.launch_error = Some(t!("profile.remove_mod_failed", error = e).to_string());
+                    this.launch_error =
+                        Some(t!("profile.remove_mod_failed", error = e).to_string());
                 }
                 this.spawn_load(cx);
             });
@@ -537,8 +536,11 @@ impl LibraryDetailView {
                                 .child(Button::new("rename-cancel").label(t!("common.cancel"))),
                         )
                         .child(
-                            DialogAction::new()
-                                .child(Button::new("rename-confirm").primary().label(t!("common.save"))),
+                            DialogAction::new().child(
+                                Button::new("rename-confirm")
+                                    .primary()
+                                    .label(t!("common.save")),
+                            ),
                         ),
                 )
                 .on_ok(move |_, _window, cx| {
@@ -644,7 +646,8 @@ impl LibraryDetailView {
             let _ = this.update(cx, |this, cx| {
                 match result {
                     Ok(added) => {
-                        this.notice = Some(t!("profile.added", names = added.join(", ")).to_string());
+                        this.notice =
+                            Some(t!("profile.added", names = added.join(", ")).to_string());
                         this.launch_error = None;
                     }
                     Err(e) => {
@@ -715,9 +718,7 @@ impl LibraryDetailView {
             let _ = this.update(cx, |this, cx| {
                 this.export_progress = None;
                 match result {
-                    Ok(()) => {
-                        this.notice = Some(t!("profile.exported", dest = dest).to_string())
-                    }
+                    Ok(()) => this.notice = Some(t!("profile.exported", dest = dest).to_string()),
                     Err(e) => {
                         this.launch_error = Some(t!("profile.export_failed", error = e).to_string())
                     }
@@ -768,13 +769,11 @@ impl Render for LibraryDetailView {
                 Alert::error("profile-not-found", t!("profile.not_found").to_string())
                     .into_any_element()
             }
-            LoadState::Failed(e) => {
-                Alert::error(
-                    "profile-load-failed",
-                    t!("common.failed", error = e).to_string(),
-                )
-                .into_any_element()
-            }
+            LoadState::Failed(e) => Alert::error(
+                "profile-load-failed",
+                t!("common.failed", error = e).to_string(),
+            )
+            .into_any_element(),
             LoadState::Loaded(profile) => {
                 // Each section is built by a helper so its (large) element
                 // temporaries live in that helper's stack frame, not all in
@@ -815,10 +814,9 @@ impl Render for LibraryDetailView {
                     .flex_col()
                     .gap_1()
                     .child(
-                        div()
-                            .text_sm()
-                            .text_color(theme.text_muted)
-                            .child(t!("profile.exporting", percent = format!("{p:.0}")).to_string()),
+                        div().text_sm().text_color(theme.text_muted).child(
+                            t!("profile.exporting", percent = format!("{p:.0}")).to_string(),
+                        ),
                     )
                     .child(Progress::new("export-progress").value(p as f32))
             }))
@@ -889,9 +887,12 @@ impl LibraryDetailView {
                     stop_btn = stop_btn.on_click(cx.listener(|this, _, _window, cx| this.stop(cx)));
                 }
                 if allow_multi {
-                    row = row.child(div().text_sm().text_color(theme.text_muted).child(
-                        t!("profile.instances_running", count = running).to_string(),
-                    ));
+                    row = row.child(
+                        div()
+                            .text_sm()
+                            .text_color(theme.text_muted)
+                            .child(t!("profile.instances_running", count = running).to_string()),
+                    );
                     row = row.child(
                         Button::new("launch-another")
                             .success()
@@ -1040,10 +1041,15 @@ impl LibraryDetailView {
                         )
                     }),
             )
-            .child(div().text_sm().text_color(theme.text_muted).child(format!(
-                "{} played",
-                format::play_time(profile.total_play_time),
-            )))
+            .child(
+                div().text_sm().text_color(theme.text_muted).child(
+                    t!(
+                        "profile.played",
+                        time = format::play_time(profile.total_play_time)
+                    )
+                    .to_string(),
+                ),
+            )
             .children((!bep_installed).then(|| {
                 div()
                     .mt_1()
@@ -1064,7 +1070,13 @@ impl LibraryDetailView {
                     .text_xs()
                     .text_color(theme.warning)
                     .child(Icon::new(IconName::TriangleAlert).xsmall())
-                    .child(t!("profile.bepinex_incompatible", platform = platform.display_name()).to_string())
+                    .child(
+                        t!(
+                            "profile.bepinex_incompatible",
+                            platform = platform.display_name()
+                        )
+                        .to_string(),
+                    )
             }));
 
         div()
@@ -1241,10 +1253,9 @@ impl LibraryDetailView {
                         .items_center()
                         .justify_between()
                         .gap_2()
-                        .child(section_heading(t!(
-                            "profile.mods_heading",
-                            count = profile.mods.len(),
-                        ).as_ref()))
+                        .child(section_heading(
+                            t!("profile.mods_heading", count = profile.mods.len(),).as_ref(),
+                        ))
                         .child(
                             div()
                                 .flex()
@@ -1252,7 +1263,7 @@ impl LibraryDetailView {
                                 .child(
                                     Button::new("install-mods")
                                         .icon(Icon::new(AppIcon::Compass))
-                                        .label(t!("profile.install_mods") )
+                                        .label(t!("profile.install_mods"))
                                         .on_click(cx.listener(|_, _, _window, cx| {
                                             cx.emit(LibraryDetailEvent::OpenExplore)
                                         })),
@@ -1260,7 +1271,7 @@ impl LibraryDetailView {
                                 .child(
                                     Button::new("add-custom-mod")
                                         .icon(Icon::new(IconName::Plus))
-                                        .label(t!("profile.add_dll") )
+                                        .label(t!("profile.add_dll"))
                                         .on_click(cx.listener(|this, _, _window, cx| {
                                             this.add_custom_mods(cx)
                                         })),
@@ -1323,9 +1334,12 @@ impl LibraryDetailView {
                                     .font_weight(FontWeight::MEDIUM)
                                     .child(t!("profile.delete_this_profile").to_string()),
                             )
-                            .child(div().text_sm().text_color(theme.text_muted).child(
-                                t!("profile.delete_this_profile_desc").to_string(),
-                            )),
+                            .child(
+                                div()
+                                    .text_sm()
+                                    .text_color(theme.text_muted)
+                                    .child(t!("profile.delete_this_profile_desc").to_string()),
+                            ),
                     )
                     .child(delete_controls),
             )
