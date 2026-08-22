@@ -994,9 +994,9 @@ mod tests {
         assert_eq!(
             options,
             vec![
+                ("ar".into(), "العربية".into()),
                 ("en".into(), "English".into()),
                 ("nl".into(), "Nederlands".into()),
-                ("ar".into(), "العربية".into()),
             ]
         );
     }
