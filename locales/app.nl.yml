@@ -220,6 +220,9 @@ icon:
   change_image: Afbeelding wijzigen
   choose_image: Afbeelding kiezen
   no_mods: Geen mods geïnstalleerd. Voeg een mod toe om het pictogram ervan te gebruiken.
+linux:
+  wine_prefix_hint: Stel de Wine-prefix of het pad naar RegionInfo.json in bij Instellingen → Linux-runtime
+  proton_compat_hint: Stel het pad naar de Proton compat data in bij Instellingen → Linux-runtime (Auto-detectie kan het vinden)
 notify:
   among_us_detected: "Among Us gevonden op %{path}"
   among_us_not_found: "Among Us kon niet automatisch worden gevonden — stel de map in via Instellingen → Spel voordat je start."
