@@ -29,7 +29,6 @@ time:
 home:
   news: 新聞
   trending: 熱門模組
-  by_author: "作者：%{author}"
 news:
   unknown_date: 未知日期
   posted_by: "發布者：%{author}"

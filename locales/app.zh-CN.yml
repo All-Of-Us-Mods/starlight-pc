@@ -20,22 +20,22 @@ common:
   retry: 重试
   unknown: 未知
   never: 永不
-  failed: "错误: %{error}"
+  failed: '错误: %{error}'
+  by_author: 作者：%{author}
 time:
-  hours_minutes: "%{hours}时 %{minutes}分"
-  minutes: "%{minutes} 分钟"
-  less_than_minute: "< 1 分钟"
+  hours_minutes: '%{hours}时 %{minutes}分'
+  minutes: '%{minutes} 分钟'
+  less_than_minute: < 1 分钟
 home:
   news: 新闻
   trending: 热门模组
-  by_author: "作者：%{author}"
 news:
   unknown_date: 未知数据
-  posted_by: "发布者：%{author}"
+  posted_by: 发布者：%{author}
   content: 内容
 explore:
   search: 搜索模组...
-  load_failed: "加载模组失败：%{error}"
+  load_failed: 加载模组失败：%{error}
   no_mods: 未发现模组
   type_label: 类型
   sort:
@@ -54,20 +54,20 @@ library:
   create_profile: 创建配置文件
   import: 导入
   import_profile: 导入配置文件
-  import_failed: "导入失败：%{error}"
-  importing: "导入中… %{percent}%"
-  add_mod_failed: "加载模组失败：%{error}"
+  import_failed: 导入失败：%{error}
+  importing: 导入中… %{percent}%
+  add_mod_failed: 加载模组失败：%{error}
   unsupported_drop: 拖入模组 .dll 文件或者被导出的 .zip 配置文件
   drop_dll_on_profile: 将模组 .dll 文件拖入到配置文件中即可安装
-  vanilla_failed: "原版启动失败：%{error}"
+  vanilla_failed: 原版启动失败：%{error}
   launch_vanilla: 启动原版
-  stop_all: "全部停止 (%{count})"
-  load_failed: "加载配置文件时失败：%{error}"
+  stop_all: 全部停止 (%{count})
+  load_failed: 加载配置文件时失败：%{error}
   empty: 尚未拥有配置文件，点击 "创建配置文件" 或拖入已有被导出的 .zip 配置文件
   setup_banner: 尚未配置Among Us路径 — 无法从配置文件启动.
   open_settings: 打开设置
-  card_stats: "%{mods} 个模组 · %{played} 个已游玩项"
-  last_launched: "上次启动时间：%{when}"
+  card_stats: '%{mods} 个模组 · %{played} 个已游玩项'
+  last_launched: 上次启动时间：%{when}
 mod:
   fallback_title: 模组
   new_profile_name: 新建配置文件名称
@@ -75,36 +75,36 @@ mod:
   pick_profile: 请先选择一个配置文件
   installing_bepinex_mods: 正在安装BepInEx框架与模组…
   installing_mods: 正在安装模组…
-  bepinex_progress: "BepInEx：%{message}"
-  install_version: "下载 v%{version} 版本"
-  downloads: "%{count} 个下载"
-  updated: "更新于 %{date}"
-  type_label: "类型：%{kind}"
+  bepinex_progress: BepInEx：%{message}
+  install_version: 下载 v%{version} 版本
+  downloads: '%{count} 个下载'
+  updated: 更新于 %{date}
+  type_label: 类型：%{kind}
   about: 关于
   changelog: 更新日志
   links: 链接
-  licensed_under: "基于 %{license} 协议"
+  licensed_under: 基于 %{license} 协议
   resolving: 正在处理依赖项…
   installed: 已安装
-  new_profile_chip: "添加新配置文件"
+  new_profile_chip: 添加新配置文件
   created_on_install: 安装时创建，并使用该模组的图标
-  optional: " (选填)"
-  dep_label: "%{name} v%{version}%{optional}"
-  dep_detail: "%{id} — 依赖 %{constraint}"
-  dep_already_installed: "%{detail} — 已安装"
-  unresolved: "%{count} 依赖项无法处理，即将跳过: %{list}"
+  optional: ' (选填)'
+  dep_label: '%{name} v%{version}%{optional}'
+  dep_detail: '%{id} — 依赖 %{constraint}'
+  dep_already_installed: '%{detail} — 已安装'
+  unresolved: '%{count} 依赖项无法处理，即将跳过: %{list}'
   install_into: 安装在配置文件中
   version: 版本
   dependencies: 依赖项
   install: 安装
 lobbies:
-  dialog_title: "启动后进入房间 %{code}"
+  dialog_title: 启动后进入房间 %{code}
   launching: 启动中…
   launch: 启动
-  code_copied: "房间代码 %{code} 已粘贴至剪切板。"
+  code_copied: 房间代码 %{code} 已粘贴至剪切板。
   code_copied_notice: 粘贴至剪切板
   copy_code: 复制房间代码
-  regions_unavailable: "%{reason} 在服务器栏中中添加一个私服，即可浏览该私服的房间。"
+  regions_unavailable: '%{reason} 在服务器栏中中添加一个私服，即可浏览该私服的房间。'
   regions_unavailable_title: 无法读取您的Among Us私服
   empty: 未发现房间，只有公开了房间列表的私服会显示在此。
   unknown_host: 未知房主
@@ -112,7 +112,7 @@ lobbies:
   bepinex_will_install: BepInEx 需要安装
   temporary_profile: 临时配置文件
   temporary_profile_subtitle: 临时配置文件，游戏关闭后将自动删除
-  region: "私服：%{region}"
+  region: 私服：%{region}
   profile: 配置文件
   no_mods_required: 无需模组。
   required_mods: 所需模组
@@ -120,23 +120,23 @@ lobbies:
   description: 在已启用且公开房间列表的私服上查看开放的游戏。启动游戏后，将复制的房间代码粘贴到游戏中。
   active: 活跃房间
   all_installed: 所有所需模组已安装
-  will_install: "将安装：%{names}"
-  more: "，+%{count} 更多"
-  checking: "正在检查 %{count} 个模组…"
-  not_in_catalog: "%{count} 不在目录中（将被跳过）"
+  will_install: 将安装：%{names}
+  more: ，+%{count} 更多
+  checking: 正在检查 %{count} 个模组…
+  not_in_catalog: '%{count} 不在目录中（将被跳过）'
   unknown_map: 未知地图
   unknown_mod: 未知模组
-  unknown_mod_version: "未知模组 %{version}"
+  unknown_mod_version: 未知模组 %{version}
   profile_gone: 所选配置文件已不存在
   profile_gone_launch: 启动前配置文件消失
   launched_region_set: 已使用该房间的私服区域启动。
   launched: 已启动。
-  skipped_catalog: " %{count} 个所需模组不在目录中，已被跳过。"
-  skipped_failed: " %{count} 个模组安装失败，已被跳过。"
+  skipped_catalog: ' %{count} 个所需模组不在目录中，已被跳过。'
+  skipped_failed: ' %{count} 个模组安装失败，已被跳过。'
 servers:
-  added: '已添加私服 "%{name}"'
+  added: 已添加私服 "%{name}"
   already_added: '"%{name}" 已添加'
-  saved: '已保存私服 "%{name}"'
+  saved: 已保存私服 "%{name}"
   my_server: 我的私服
   edit_title: 编辑私服
   add_title: 添加自定义私服
@@ -154,61 +154,62 @@ servers:
   no_regions: 尚未配置私服。请在下方添加。
   edit_tooltip: 编辑此私服
   remove_tooltip: 移除此私服
-  load_failed: "加载私服失败：%{error}"
+  load_failed: 加载私服失败：%{error}
   none_available: 没有可用的私服。
   all_added: 所有可用私服已添加。
-  by_address: "由 %{owner} · %{address}:%{port}"
+  by_address: 由 %{owner} · %{address}:%{port}
   description: 添加社区私服作为 Among Us 区域。重启游戏以应用更改。
   installed_regions: 已安装的私服
   available: 可用私服
 profile:
   fallback_title: 配置文件
+  played: '%{time} 已游玩'
   this_profile: 此配置文件
   not_found: 未找到配置文件
   bepinex_not_installed: BepInEx 未安装
-  bepinex_incompatible: "此 BepInEx 安装与 %{platform} 不兼容"
+  bepinex_incompatible: 此 BepInEx 安装与 %{platform} 不兼容
   install_bepinex: 安装 BepInEx
-  instances_running: "%{count} 个实例正在运行"
+  instances_running: '%{count} 个实例正在运行'
   launch_another: 启动另一个
   open_folder: 打开文件夹
   export_zip: 导出 ZIP
   desktop_shortcut: 桌面快捷方式
-  exporting: "正在导出… %{percent}%"
-  exported: "已导出配置文件至 %{dest}"
-  export_failed: "导出失败：%{error}"
-  shortcut_created: "已在 %{path} 创建快捷方式"
-  shortcut_failed: "创建快捷方式失败：%{error}"
+  exporting: 正在导出… %{percent}%
+  exported: 已导出配置文件至 %{dest}
+  export_failed: 导出失败：%{error}
+  shortcut_created: 已在 %{path} 创建快捷方式
+  shortcut_failed: 创建快捷方式失败：%{error}
   rename_title: 重命名配置文件
-  rename_failed: "重命名失败：%{error}"
+  rename_failed: 重命名失败：%{error}
   delete_title: 删除配置文件
-  delete_desc: '删除 "%{name}"？其模组和日志将从磁盘移除。此操作不可撤销。'
-  delete_failed: "删除失败：%{error}"
+  delete_desc: 删除 "%{name}"？其模组和日志将从磁盘移除。此操作不可撤销。
+  delete_failed: 删除失败：%{error}
   delete_profile: 删除配置文件
   delete_this_profile: 删除此配置文件
   delete_this_profile_desc: 从磁盘移除该配置文件及其模组和日志。此操作不可撤销。
   danger_zone: 危险区域
   remove_mod_title: 移除模组
-  remove_mod_desc: '从该配置文件中移除 "%{name}"？其文件将从磁盘删除。'
+  remove_mod_desc: 从该配置文件中移除 "%{name}"？其文件将从磁盘删除。
   remove: 移除
-  remove_mod_failed: "移除模组失败：%{error}"
-  toggle_failed: "切换失败：%{error}"
+  remove_mod_failed: 移除模组失败：%{error}
+  toggle_failed: 切换失败：%{error}
   add_dll_prompt: 添加 BepInEx 插件 (.dll)
   drop_dll: 拖放模组 .dll 文件以将其添加到此配置文件
   drop_zip: 从资源库页面导入配置文件 .zip 文件
-  added: "已添加 %{names}"
+  added: 已添加 %{names}
   custom_mod: 自定义
   no_mods: 未安装模组。从“发现”安装，或在此处拖放 BepInEx 插件 .dll。
-  mods_heading: "模组 · %{count}"
+  mods_heading: 模组 · %{count}
   install_mods: 安装模组
   add_dll: 添加 DLL
 icon:
   title: 编辑配置文件图标
   choose_image_prompt: 选择图标图片
   image_empty: 所选图片为空
-  image_read_failed: "读取图片失败：%{error}"
+  image_read_failed: 读取图片失败：%{error}
   choose_custom: 为自定义图标选择图片
   select_mod: 选择已安装的模组图标
-  update_failed: "更新图标失败：%{error}"
+  update_failed: 更新图标失败：%{error}
   tab_default: 默认
   tab_custom: 自定义图片
   tab_mod: 已安装模组
@@ -219,25 +220,40 @@ icon:
   change_image: 更换图片
   choose_image: 选择图片
   no_mods: 未安装模组。添加模组以使用其图标。
+linux:
+  wine_prefix_hint: 在“设置 → Linux 运行时”中设置 Wine 前缀或 RegionInfo.json 路径
+  proton_compat_hint: 在“设置 → Linux 运行时”中设置 Proton 兼容数据路径（自动检测可以找到它）
 notify:
-  among_us_detected: "在 %{path} 检测到 Among Us"
+  among_us_detected: 在 %{path} 检测到 Among Us
   among_us_not_found: 无法自动找到 Among Us — 启动前请在“设置 → 游戏”中设置其文件夹。
 migrate:
-  offer: "发现来自旧版 Starlight 的 %{count} 个配置文件。是否迁移到当前安装？"
+  offer: 发现来自旧版 Starlight 的 %{count} 个配置文件。是否迁移到当前安装？
   title: 迁移配置文件
   action: 迁移
-  done: "已迁移 %{count} 个配置文件"
-  failed: "迁移失败：%{error}"
+  done: 已迁移 %{count} 个配置文件
+  failed: 迁移失败：%{error}
+log:
+  latest: 最新日志
+  filter: 筛选日志…
+  copy: 复制筛选后的日志
+  lines: '%{kept} / %{total} 行'
+  level:
+    error: 错误
+    warning: 警告
+    info: 信息
+    message: 消息
+    debug: 调试
+    other: 其他
 titlebar:
-  stop_count: "停止 (%{count})"
-  launch: "启动 %{name}"
-  launch_failed: "启动失败：%{error}"
-  stop_failed: "停止失败：%{error}"
+  stop_count: 停止 (%{count})
+  launch: 启动 %{name}
+  launch_failed: 启动失败：%{error}
+  stop_failed: 停止失败：%{error}
 update:
-  available: "Starlight %{version} 可用更新。"
+  available: Starlight %{version} 可用更新。
   title: 更新可用
   restart: 重启并更新
-  failed: "更新失败：%{error}"
+  failed: 更新失败：%{error}
 settings:
   page:
     game: 游戏
@@ -254,7 +270,7 @@ settings:
     cache: 缓存
     download_urls: 下载 URL
     runner: 启动器
-    runner_desc: '通过 Steam 客户端启动（Steam 必须运行）。对于模组启动，请将游戏的 Steam 启动选项设置为 WINEDLLOVERRIDES="winhttp=n,b" %command%。'
+    runner_desc: 通过 Steam 客户端启动（Steam 必须运行）。对于模组启动，请将游戏的 Steam 启动选项设置为 WINEDLLOVERRIDES="winhttp=n,b" %command%。
   among_us_path: Among Us 路径
   among_us_path_desc: 包含 Among Us.exe 的文件夹。
   auto_detect: 自动检测
@@ -265,7 +281,7 @@ settings:
   close_on_launch: 启动时关闭 Starlight
   close_on_launch_desc: 启动游戏后退出应用。
   multi_instance: 允许多实例
-  multi_instance_desc: "允许同时启动多个游戏窗口。额外实例将从配置文件的临时副本运行，因此它们可以立即启动，避免 BepInEx 文件冲突。"
+  multi_instance_desc: 允许同时启动多个游戏窗口。额外实例将从配置文件的临时副本运行，因此它们可以立即启动，避免 BepInEx 文件冲突。
   theme: 主题
   theme_desc: 将 gpui-component 主题 JSON 文件放入 themes 文件夹以添加自定义主题。
   language: 语言
@@ -281,32 +297,32 @@ settings:
   cache:
     x64: x64 缓存
     x86: x86 缓存
-    cached: "已缓存 · %{size}"
+    cached: 已缓存 · %{size}
     not_cached: 未缓存
     path_unavailable: 缓存路径不可用
     download: 下载
-    downloaded: "已下载 BepInEx %{arch}"
-    download_failed: "BepInEx %{arch} 下载失败：%{error}"
-    cleared: "已清除 BepInEx %{arch} 缓存"
-    clear_failed: "清除失败：%{error}"
-    path_error: "缓存路径：%{error}"
+    downloaded: 已下载 BepInEx %{arch}
+    download_failed: BepInEx %{arch} 下载失败：%{error}
+    cleared: 已清除 BepInEx %{arch} 缓存
+    clear_failed: 清除失败：%{error}
+    path_error: 缓存路径：%{error}
   bepinex_x64_url: BepInEx x64 URL
   bepinex_x86_url: BepInEx x86 URL
   download_urls_desc: 覆盖默认的发布存档位置。
-  detected: "在 %{path} 检测到 Among Us"
-  detected_store: "在 %{path} 检测到 Among Us (%{store})"
+  detected: 在 %{path} 检测到 Among Us
+  detected_store: 在 %{path} 检测到 Among Us (%{store})
   not_detected: 无法自动检测 Among Us 安装
-  detection_failed: "检测失败：%{error}"
+  detection_failed: 检测失败：%{error}
   linux:
     detected: 检测到 Linux 运行时
     auto_detect: 自动检测 Linux 运行时
     auto_detect_desc: 从 Among Us 路径探测 Steam/Proton + Wine 前缀。
     runner: 启动器
-    runner_desc: '通过 Steam 客户端启动（Steam 必须运行）。对于模组启动，请将游戏的 Steam 启动选项设置为 WINEDLLOVERRIDES="winhttp=n,b" %command%。'
+    runner_desc: 通过 Steam 客户端启动（Steam 必须运行）。对于模组启动，请将游戏的 Steam 启动选项设置为 WINEDLLOVERRIDES="winhttp=n,b" %command%。
     runner_binary: 启动器二进制文件
     wine_prefix: Wine 前缀
     region_info_path: RegionInfo.json 路径
-    region_info_desc: "Wine 前缀中的 Among Us 的 RegionInfo.json 文件，用于服务器管理。若留空，则从 Wine 前缀中自动获取（drive_c/users/<your user>/AppData/LocalLow/Innersloth/Among Us）"
+    region_info_desc: Wine 前缀中的 Among Us 的 RegionInfo.json 文件，用于服务器管理。若留空，则从 Wine 前缀中自动获取（drive_c/users/<your user>/AppData/LocalLow/Innersloth/Among Us）
     proton_compat: Proton 兼容数据路径
     proton_compat_desc: 游戏的 Steam compatdata 文件夹（steamapps/compatdata/945360）。也用于定位 RegionInfo.json 以进行私服管理。
     steam_run: 通过 steam-run 包装 Proton
