@@ -153,7 +153,7 @@ fn news_card(post: &Post, theme: &crate::theme::Theme, cx: &mut Context<HomeView
             div()
                 .text_xs()
                 .text_color(theme.text_muted)
-                .child(t!("home.by_author", author = post.author).to_string()),
+                .child(t!("common.by_author", author = post.author).to_string()),
         )
         .child(
             div()

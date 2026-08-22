@@ -5,6 +5,7 @@ use crate::theme::Theme;
 use crate::ui::icon::AppIcon;
 use gpui_component::Icon;
 use gpui_component::skeleton::Skeleton;
+use rust_i18n::t;
 
 pub const MOD_CARD_HEIGHT: f32 = 160.0;
 pub const MOD_CARD_IMAGE_SIZE: f32 = 160.0;
@@ -67,7 +68,7 @@ pub fn mod_card(
                         .truncate()
                         .text_sm()
                         .text_color(theme.text_muted)
-                        .child(format!("by {}", m.author)),
+                        .child(t!("common.by_author", author = m.author).to_string()),
                 )
                 .child(
                     div()

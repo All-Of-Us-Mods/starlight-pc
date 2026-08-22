@@ -21,6 +21,7 @@ common:
   unknown: Onbekend
   never: Nooit
   failed: "Mislukt: %{error}"
+  by_author: "door %{author}"
 time:
   hours_minutes: "%{hours}u %{minutes}m"
   minutes: "%{minutes} min"
@@ -28,7 +29,6 @@ time:
 home:
   news: Nieuws
   trending: Populaire mods
-  by_author: "door %{author}"
 news:
   unknown_date: Onbekende datum
   posted_by: "Geplaatst door %{author}"

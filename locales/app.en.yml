@@ -21,6 +21,7 @@ common:
   unknown: Unknown
   never: Never
   failed: "Failed: %{error}"
+  by_author: "by %{author}"
 time:
   hours_minutes: "%{hours}h %{minutes}m"
   minutes: "%{minutes} min"
@@ -28,7 +29,6 @@ time:
 home:
   news: News
   trending: Trending Mods
-  by_author: "by %{author}"
 news:
   unknown_date: Unknown date
   posted_by: "Posted by %{author}"

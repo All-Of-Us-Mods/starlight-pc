@@ -22,6 +22,7 @@ common:
   unknown: غير معروف
   never: أبداً
   failed: "فشل: %{error}"
+  by_author: "بواسطة %{author}"
 
 time:
   hours_minutes: "%{hours}س %{minutes}د"
@@ -31,7 +32,6 @@ time:
 home:
   news: الأخبار
   trending: التعديلات الرائجة
-  by_author: "بواسطة %{author}"
 
 news:
   unknown_date: تاريخ غير معروف

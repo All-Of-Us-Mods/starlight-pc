@@ -668,7 +668,7 @@ impl Render for ModDetailView {
                                 div()
                                     .text_sm()
                                     .text_color(theme.text_muted)
-                                    .child(t!("home.by_author", author = m.author).to_string()),
+                                    .child(t!("common.by_author", author = m.author).to_string()),
                             ),
                     )
                     .child(div().flex().justify_center().child(install_button))
