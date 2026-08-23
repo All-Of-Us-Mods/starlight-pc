@@ -2,12 +2,14 @@ use gpui::*;
 use log::warn;
 use rust_i18n::t;
 
+use std::collections::{HashMap, HashSet};
 use std::path::PathBuf;
 
 use crate::backend::events::{self, BackendEvent};
 use crate::backend::services::launch_service;
 use crate::backend::services::profile_service::{self, ProfileEntry, ZipOp};
 use crate::backend::state::game_runtime;
+use crate::backend::state::mod_catalog_cache;
 use crate::settings as app_settings;
 use crate::theme::ThemeExt;
 use crate::ui::file_drop::DroppedFiles;
@@ -44,6 +46,8 @@ pub struct LibraryView {
     /// reads can finish out of order — a load only applies if it's still the
     /// newest one, so an older snapshot can't hide a just-imported profile.
     load_generation: u64,
+    /// Latest catalog release per mod id, shared with profile detail views.
+    latest_mod_versions: HashMap<String, String>,
 }
 
 enum LoadState {
@@ -63,6 +67,7 @@ impl LibraryView {
             stoppable_count: initial.stoppable_running_count,
             import_progress: None,
             load_generation: 0,
+            latest_mod_versions: mod_catalog_cache::cached_latest_versions(),
         };
         view.load_profiles(cx);
 
@@ -121,7 +126,48 @@ impl LibraryView {
                     }
                 };
                 cx.notify();
+                this.fetch_latest_mod_versions(cx);
             });
+        })
+        .detach();
+    }
+
+    /// Populate the profile-card update summaries without blocking the initial
+    /// Library render. The process cache makes duplicate mods across profiles a
+    /// single lookup for the app session.
+    fn fetch_latest_mod_versions(&self, cx: &mut Context<Self>) {
+        let LoadState::Loaded(profiles) = &self.state else {
+            return;
+        };
+        let mod_ids: HashSet<String> = profiles
+            .iter()
+            .flat_map(|profile| &profile.mods)
+            .filter(|installed| installed.enabled && !installed.is_custom())
+            .map(|installed| installed.mod_id.clone())
+            .collect();
+        if mod_ids.is_empty() {
+            return;
+        }
+
+        cx.spawn(async move |this, cx| {
+            let tasks: Vec<_> = mod_ids
+                .into_iter()
+                .map(|mod_id| {
+                    let id_for_fetch = mod_id.clone();
+                    let task = cx.background_executor().spawn(async move {
+                        mod_catalog_cache::fetch_latest_version(&id_for_fetch)
+                    });
+                    (mod_id, task)
+                })
+                .collect();
+            for (mod_id, task) in tasks {
+                if let Some(latest) = task.await {
+                    let _ = this.update(cx, |this, cx| {
+                        this.latest_mod_versions.insert(mod_id, latest);
+                        cx.notify();
+                    });
+                }
+            }
         })
         .detach();
     }
@@ -461,6 +507,18 @@ impl LibraryView {
         let emit_id = id.clone();
         let drop_id = id.clone();
         let accent = theme.primary;
+        let outdated_count = profile
+            .mods
+            .iter()
+            .filter(|installed| installed.enabled)
+            .filter(|installed| {
+                self.latest_mod_versions
+                    .get(&installed.mod_id)
+                    .is_some_and(|latest| {
+                        mod_catalog_cache::is_version_outdated(&installed.version, latest)
+                    })
+            })
+            .count();
         div()
             .id(SharedString::from(id))
             .flex()
@@ -494,8 +552,17 @@ impl LibraryView {
                         div()
                             .text_base()
                             .font_weight(FontWeight::SEMIBOLD)
+                            .truncate()
                             .child(profile.name.clone()),
                     )
+                    .children((outdated_count > 0).then(|| {
+                        let label = if outdated_count == 1 {
+                            t!("profile.one_update_available").to_string()
+                        } else {
+                            t!("profile.updates_available", count = outdated_count).to_string()
+                        };
+                        div().text_xs().text_color(theme.text_muted).child(label)
+                    }))
                     .children(profile.bepinex_installed.is_none().then(|| {
                         div()
                             .text_xs()

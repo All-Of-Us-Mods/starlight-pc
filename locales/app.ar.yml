@@ -208,6 +208,15 @@ profile:
   drop_zip: استورد ملفات .zip الخاصة بالملفات الشخصية من صفحة المكتبة
   added: "تمت إضافة %{names}"
   custom_mod: مخصص
+  one_update_available: تحديث واحد متاح # START AI generated, please review
+  updates_available: "%{count} تحديثات متاحة"
+  update_all_mods: "تحديث الكل (%{count})"
+  updating_all_mods: جارٍ تحديث التعديلات…
+  update_mod: تحديث
+  updating_mod: جارٍ التحديث…
+  updated_one_mod: تم تحديث تعديل واحد
+  updated_mods: "تم تحديث %{count} تعديلات"
+  update_mods_failed: "فشل التحديث: %{error}" # END AI generated, please review
   no_mods: لا توجد تعديلات مثبتة. ثبّت التعديلات من الاستكشاف، أو أسقط إضافة BepInEx بصيغة .dll هنا.
   mods_heading: "التعديلات · %{count}"
   install_mods: تثبيت التعديلات

@@ -86,11 +86,48 @@ pub fn resolve_dependencies_excluding(
     dependencies: &[ModDependency],
     skip: &HashSet<String>,
 ) -> AppResult<(Vec<ResolvedDependency>, Vec<String>)> {
+    resolve_dependencies_inner(dependencies, skip, true, None)
+}
+
+/// Resolve only required dependency branches. Used by one-click updates,
+/// where optional dependencies cannot be presented for an explicit choice.
+#[cfg(test)]
+fn resolve_required_dependencies_excluding(
+    dependencies: &[ModDependency],
+    skip: &HashSet<String>,
+) -> AppResult<(Vec<ResolvedDependency>, Vec<String>)> {
+    resolve_dependencies_inner(dependencies, skip, false, None)
+}
+
+/// Resolve required dependency branches while treating `pinned_versions` as
+/// roots that the caller will install itself. Unlike a plain exclusion set,
+/// every dependency edge targeting a pinned root is validated against that
+/// root's selected version before the walk skips it.
+pub fn resolve_required_dependencies_with_pins(
+    dependencies: &[ModDependency],
+    pinned_versions: &HashMap<String, String>,
+) -> AppResult<(Vec<ResolvedDependency>, Vec<String>)> {
+    resolve_dependencies_inner(dependencies, &HashSet::new(), false, Some(pinned_versions))
+}
+
+fn resolve_dependencies_inner(
+    dependencies: &[ModDependency],
+    skip: &HashSet<String>,
+    include_optional: bool,
+    pinned_versions: Option<&HashMap<String, String>>,
+) -> AppResult<(Vec<ResolvedDependency>, Vec<String>)> {
     let mut out = Vec::new();
     let mut unresolved = Vec::new();
     let mut visited: HashSet<String> = skip.clone();
     for dep in dependencies {
-        walk_dep(dep, &mut visited, &mut out, &mut unresolved);
+        walk_dep(
+            dep,
+            &mut visited,
+            &mut out,
+            &mut unresolved,
+            include_optional,
+            pinned_versions,
+        );
     }
     Ok((out, unresolved))
 }
@@ -100,7 +137,21 @@ fn walk_dep(
     visited: &mut HashSet<String>,
     out: &mut Vec<ResolvedDependency>,
     unresolved: &mut Vec<String>,
+    include_optional: bool,
+    pinned_versions: Option<&HashMap<String, String>>,
 ) {
+    if !include_optional && dep.dependency_type.eq_ignore_ascii_case("optional") {
+        return;
+    }
+    if let Some(pinned_version) = pinned_versions.and_then(|pins| pins.get(&dep.mod_id)) {
+        if !version_satisfies_constraint(pinned_version, &dep.version_constraint) {
+            unresolved.push(format!(
+                "{} {} does not satisfy {}",
+                dep.mod_id, pinned_version, dep.version_constraint
+            ));
+        }
+        return;
+    }
     if !visited.insert(dep.mod_id.clone()) {
         return;
     }
@@ -134,7 +185,14 @@ fn walk_dep(
     // Recurse into this dep's own dependencies first so they install before it.
     if let Ok(info) = api::fetch_mod_version_info(&dep.mod_id, &version) {
         for sub in &info.dependencies {
-            walk_dep(sub, visited, out, unresolved);
+            walk_dep(
+                sub,
+                visited,
+                out,
+                unresolved,
+                include_optional,
+                pinned_versions,
+            );
         }
     }
 
@@ -145,6 +203,22 @@ fn walk_dep(
         dependency_type: dep.dependency_type.clone(),
         version_constraint: dep.version_constraint.clone(),
     });
+}
+
+fn version_satisfies_constraint(version: &str, constraint: &str) -> bool {
+    if constraint == "*" {
+        return true;
+    }
+    match (
+        Version::parse(version.trim_start_matches('v')),
+        VersionReq::parse(constraint),
+    ) {
+        (Ok(version), Ok(requirement)) => requirement.matches(&version),
+        // Preserve the resolver's existing fallback for legacy constraints it
+        // cannot parse instead of rejecting previously installable metadata.
+        (_, Err(_)) => true,
+        (Err(_), Ok(_)) => false,
+    }
 }
 
 /// Expand the mods a lobby requires into a concrete install list, including
@@ -309,6 +383,21 @@ pub fn install_mods_for_profile(
         .ok_or_else(|| AppError::validation(format!("Profile '{profile_id}' not found")))?;
     let profile_path = profile.path.clone();
 
+    // Updating a disabled mod would currently replace its manifest entry with
+    // an enabled one. Require the user to opt in by enabling it first, and
+    // enforce that rule here so non-UI install paths cannot bypass it.
+    if let Some(item) = mods.iter().find(|item| {
+        profile
+            .mods
+            .iter()
+            .any(|installed| installed.mod_id == item.mod_id && !installed.enabled)
+    }) {
+        return Err(AppError::validation(format!(
+            "Mod '{}' is disabled; enable it before updating",
+            item.mod_id
+        )));
+    }
+
     // Snapshot prior entries so we can restore the manifest on rollback.
     let mut previous: HashMap<String, Option<(String, Option<String>)>> = HashMap::new();
     for item in mods {
@@ -389,16 +478,13 @@ pub fn install_mods_for_profile(
             file_name: target.file_name.clone(),
         });
 
-        // If the file name changed (e.g. upgrading versions), the old file is
-        // now orphaned — but keep it until the whole batch succeeds.
-        if let Some(Some((_v, Some(old_file)))) = previous.get(&item.mod_id)
+        if let Some(Some((_version, Some(old_file)))) = previous.get(&item.mod_id)
             && old_file != &target.file_name
         {
             replaced_files.push(old_file.clone());
         }
     }
 
-    // Every mod installed; the old files can no longer be needed by a rollback.
     for old_file in replaced_files {
         let _ = profile_service::delete_mod_file(&profile_path, &old_file);
     }
@@ -432,5 +518,63 @@ fn rollback(
     }
     for item in downloaded.iter().rev() {
         let _ = profile_service::delete_mod_file(profile_path, &item.file_name);
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::collections::{HashMap, HashSet};
+
+    use crate::backend::api::ModDependency;
+
+    use super::{resolve_required_dependencies_excluding, resolve_required_dependencies_with_pins};
+
+    #[test]
+    fn required_update_plan_skips_optional_and_explicitly_excluded_mods() {
+        let dependencies = vec![
+            ModDependency {
+                mod_id: "optional-mod".into(),
+                name: "Optional".into(),
+                version_constraint: "*".into(),
+                dependency_type: "optional".into(),
+            },
+            ModDependency {
+                mod_id: "root-mod".into(),
+                name: "Root".into(),
+                version_constraint: "*".into(),
+                dependency_type: "required".into(),
+            },
+        ];
+        let skip = HashSet::from(["root-mod".to_string()]);
+
+        let (resolved, unresolved) =
+            resolve_required_dependencies_excluding(&dependencies, &skip).unwrap();
+
+        assert!(resolved.is_empty());
+        assert!(unresolved.is_empty());
+    }
+
+    #[test]
+    fn pinned_batch_root_must_satisfy_incoming_constraint() {
+        let dependency = ModDependency {
+            mod_id: "shared-root".into(),
+            name: "Shared Root".into(),
+            version_constraint: "^1.0".into(),
+            dependency_type: "required".into(),
+        };
+
+        let incompatible = HashMap::from([("shared-root".into(), "2.0.0".into())]);
+        let (_, unresolved) = resolve_required_dependencies_with_pins(
+            std::slice::from_ref(&dependency),
+            &incompatible,
+        )
+        .unwrap();
+        assert_eq!(unresolved.len(), 1);
+
+        let compatible = HashMap::from([("shared-root".into(), "1.4.0".into())]);
+        let (resolved, unresolved) =
+            resolve_required_dependencies_with_pins(&[dependency], &compatible).unwrap();
+        assert!(resolved.is_empty());
+        assert!(unresolved.is_empty());
     }
 }

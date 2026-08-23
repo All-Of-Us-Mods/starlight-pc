@@ -198,6 +198,15 @@ profile:
   drop_zip: 从资源库页面导入配置文件 .zip 文件
   added: 已添加 %{names}
   custom_mod: 自定义
+  one_update_available: 1 个更新可用 # START AI generated, please review
+  updates_available: "%{count} 个更新可用"
+  update_all_mods: "全部更新（%{count}）"
+  updating_all_mods: 正在更新模组…
+  update_mod: 更新
+  updating_mod: 正在更新…
+  updated_one_mod: 已更新 1 个模组
+  updated_mods: "已更新 %{count} 个模组"
+  update_mods_failed: "更新失败：%{error}" # END AI generated, please review
   no_mods: 未安装模组。从“发现”安装，或在此处拖放 BepInEx 插件 .dll。
   mods_heading: 模组 · %{count}
   install_mods: 安装模组
