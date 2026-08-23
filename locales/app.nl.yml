@@ -198,6 +198,15 @@ profile:
   drop_zip: Importeer profiel-.zipbestanden vanaf de Bibliotheekpagina
   added: "%{names} toegevoegd"
   custom_mod: Aangepast
+  one_update_available: 1 update beschikbaar
+  updates_available: "%{count} updates beschikbaar"
+  update_all_mods: "Alles bijwerken (%{count})"
+  updating_all_mods: Mods bijwerken…
+  update_mod: Bijwerken
+  updating_mod: Bijwerken…
+  updated_one_mod: 1 mod bijgewerkt
+  updated_mods: "%{count} mods bijgewerkt"
+  update_mods_failed: "Bijwerken mislukt: %{error}"
   no_mods: Geen mods geïnstalleerd. Installeer ze via Ontdekken, of sleep hier een BepInEx-plugin-.dll naartoe.
   mods_heading: "Mods · %{count}"
   install_mods: Mods installeren

@@ -86,11 +86,34 @@ pub fn resolve_dependencies_excluding(
     dependencies: &[ModDependency],
     skip: &HashSet<String>,
 ) -> AppResult<(Vec<ResolvedDependency>, Vec<String>)> {
+    resolve_dependencies_inner(dependencies, skip, true)
+}
+
+/// Resolve only required dependency branches. Used by one-click updates,
+/// where optional dependencies cannot be presented for an explicit choice.
+pub fn resolve_required_dependencies_excluding(
+    dependencies: &[ModDependency],
+    skip: &HashSet<String>,
+) -> AppResult<(Vec<ResolvedDependency>, Vec<String>)> {
+    resolve_dependencies_inner(dependencies, skip, false)
+}
+
+fn resolve_dependencies_inner(
+    dependencies: &[ModDependency],
+    skip: &HashSet<String>,
+    include_optional: bool,
+) -> AppResult<(Vec<ResolvedDependency>, Vec<String>)> {
     let mut out = Vec::new();
     let mut unresolved = Vec::new();
     let mut visited: HashSet<String> = skip.clone();
     for dep in dependencies {
-        walk_dep(dep, &mut visited, &mut out, &mut unresolved);
+        walk_dep(
+            dep,
+            &mut visited,
+            &mut out,
+            &mut unresolved,
+            include_optional,
+        );
     }
     Ok((out, unresolved))
 }
@@ -100,7 +123,11 @@ fn walk_dep(
     visited: &mut HashSet<String>,
     out: &mut Vec<ResolvedDependency>,
     unresolved: &mut Vec<String>,
+    include_optional: bool,
 ) {
+    if !include_optional && dep.dependency_type.eq_ignore_ascii_case("optional") {
+        return;
+    }
     if !visited.insert(dep.mod_id.clone()) {
         return;
     }
@@ -134,7 +161,7 @@ fn walk_dep(
     // Recurse into this dep's own dependencies first so they install before it.
     if let Ok(info) = api::fetch_mod_version_info(&dep.mod_id, &version) {
         for sub in &info.dependencies {
-            walk_dep(sub, visited, out, unresolved);
+            walk_dep(sub, visited, out, unresolved, include_optional);
         }
     }
 
@@ -432,5 +459,39 @@ fn rollback(
     }
     for item in downloaded.iter().rev() {
         let _ = profile_service::delete_mod_file(profile_path, &item.file_name);
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::collections::HashSet;
+
+    use crate::backend::api::ModDependency;
+
+    use super::resolve_required_dependencies_excluding;
+
+    #[test]
+    fn required_update_plan_skips_optional_and_explicitly_excluded_mods() {
+        let dependencies = vec![
+            ModDependency {
+                mod_id: "optional-mod".into(),
+                name: "Optional".into(),
+                version_constraint: "*".into(),
+                dependency_type: "optional".into(),
+            },
+            ModDependency {
+                mod_id: "root-mod".into(),
+                name: "Root".into(),
+                version_constraint: "*".into(),
+                dependency_type: "required".into(),
+            },
+        ];
+        let skip = HashSet::from(["root-mod".to_string()]);
+
+        let (resolved, unresolved) =
+            resolve_required_dependencies_excluding(&dependencies, &skip).unwrap();
+
+        assert!(resolved.is_empty());
+        assert!(unresolved.is_empty());
     }
 }

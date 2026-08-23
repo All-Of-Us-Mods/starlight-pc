@@ -198,6 +198,15 @@ profile:
   drop_zip: Import profile .zips from the Library page
   added: "Added %{names}"
   custom_mod: Custom
+  one_update_available: 1 update available
+  updates_available: "%{count} updates available"
+  update_all_mods: "Update all (%{count})"
+  updating_all_mods: Updating mods…
+  update_mod: Update
+  updating_mod: Updating…
+  updated_one_mod: Updated 1 mod
+  updated_mods: "Updated %{count} mods"
+  update_mods_failed: "Update failed: %{error}"
   no_mods: No mods installed. Install from Explore, or drop a BepInEx plugin .dll here.
   mods_heading: "Mods · %{count}"
   install_mods: Install Mods

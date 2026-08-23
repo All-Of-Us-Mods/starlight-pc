@@ -10,14 +10,16 @@ use gpui::*;
 use log::warn;
 use rust_i18n::t;
 
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::path::{Path, PathBuf};
 use std::process::Command;
+use std::sync::{Arc, Mutex};
 
 use crate::backend::api;
 use crate::backend::events::{self, BackendEvent};
 use crate::backend::services::bepinex_service::{BepInExProgress, BepInExTargetType};
 use crate::backend::services::launch_service;
+use crate::backend::services::mod_install_service::{self, InstallModInput};
 use crate::backend::services::profile_service::{self, ProfileEntry, ProfileModEntry, ZipOp};
 #[cfg(windows)]
 use crate::backend::services::profile_shortcut_service;
@@ -73,6 +75,14 @@ pub struct LibraryDetailView {
     log_panel: Entity<LogPanel>,
     /// API-resolved display names per mod_id, populated lazily after load.
     mod_names: HashMap<String, String>,
+    /// Latest catalog release per mod_id, populated alongside display names.
+    mod_latest_versions: HashMap<String, String>,
+    /// Mod ids currently being updated. Kept per row so unrelated controls
+    /// remain available while one download is in flight.
+    updating_mods: HashSet<String>,
+    /// Serializes separately requested updates for this profile so their
+    /// manifest writes cannot race while the UI keeps unrelated rows usable.
+    update_lock: Arc<Mutex<()>>,
     /// Whether the cursor is over the hero icon / name, revealing their
     /// inline edit buttons.
     icon_hovered: bool,
@@ -104,6 +114,9 @@ impl LibraryDetailView {
             pending_launches: 0,
             log_panel,
             mod_names: mod_catalog_cache::cached_names(),
+            mod_latest_versions: mod_catalog_cache::cached_latest_versions(),
+            updating_mods: HashSet::new(),
+            update_lock: Arc::new(Mutex::new(())),
             icon_hovered: false,
             name_hovered: false,
         };
@@ -205,54 +218,53 @@ impl LibraryDetailView {
                 };
                 cx.notify();
                 this.refresh_disk_state(cx);
-                this.fetch_missing_mod_names(cx);
+                this.fetch_mod_catalog_data(cx);
             });
         })
         .detach();
     }
 
-    /// Resolve API display names for any mods we haven't seen yet. Successful
-    /// lookups are shared across detail-page instances for the app session.
-    fn fetch_missing_mod_names(&self, cx: &mut Context<Self>) {
+    /// Resolve display names and latest releases for installed catalog mods.
+    /// Successful lookups are shared across detail-page instances for the app
+    /// session, so returning to a profile does not repeat network requests.
+    fn fetch_mod_catalog_data(&self, cx: &mut Context<Self>) {
         let LoadState::Loaded(profile) = &self.state else {
             return;
         };
-        let cached = mod_catalog_cache::cached_names();
-        let pending: Vec<String> = profile
+        let mod_ids: Vec<String> = profile
             .mods
             .iter()
-            // Custom mods aren't in the catalog — don't look them up.
             .filter(|m| !m.is_custom())
             .map(|m| m.mod_id.clone())
-            .filter(|id| !cached.contains_key(id) && !self.mod_names.contains_key(id))
             .collect();
-        if !cached.is_empty() {
-            cx.spawn(async move |this, cx| {
-                let _ = this.update(cx, |this, cx| {
-                    this.mod_names.extend(cached);
-                    cx.notify();
-                });
-            })
-            .detach();
-        }
-        if pending.is_empty() {
+        if mod_ids.is_empty() {
             return;
         }
         cx.spawn(async move |this, cx| {
-            let tasks: Vec<_> = pending
+            let tasks: Vec<_> = mod_ids
                 .into_iter()
                 .map(|mod_id| {
                     let id_for_fetch = mod_id.clone();
                     let task = cx.background_executor().spawn(async move {
-                        mod_catalog_cache::fetch(&id_for_fetch).map(|m| m.name)
+                        let name = mod_catalog_cache::fetch(&id_for_fetch).map(|m| m.name);
+                        let latest = name
+                            .as_ref()
+                            .and_then(|_| mod_catalog_cache::fetch_latest_version(&id_for_fetch));
+                        (name, latest)
                     });
                     (mod_id, task)
                 })
                 .collect();
             for (mod_id, task) in tasks {
-                if let Some(name) = task.await {
+                let (name, latest) = task.await;
+                if name.is_some() || latest.is_some() {
                     let _ = this.update(cx, |this, cx| {
-                        this.mod_names.insert(mod_id, name);
+                        if let Some(name) = name {
+                            this.mod_names.insert(mod_id.clone(), name);
+                        }
+                        if let Some(latest) = latest {
+                            this.mod_latest_versions.insert(mod_id, latest);
+                        }
                         cx.notify();
                     });
                 }
@@ -316,6 +328,109 @@ impl LibraryDetailView {
                     this.launch_error = Some(t!("profile.toggle_failed", error = e).to_string());
                     this.spawn_load(cx);
                 }
+            });
+        })
+        .detach();
+    }
+
+    /// Update one or more outdated catalog mods as a rollback-safe batch.
+    /// Required dependencies are installed first; optional branches remain
+    /// opt-in via the normal install flow.
+    fn update_mods(&mut self, mut updates: Vec<(String, String)>, cx: &mut Context<Self>) {
+        updates.retain(|(mod_id, _)| !self.updating_mods.contains(mod_id));
+        if updates.is_empty() {
+            return;
+        }
+        self.updating_mods
+            .extend(updates.iter().map(|(mod_id, _)| mod_id.clone()));
+        self.notice = None;
+        self.launch_error = None;
+        cx.notify();
+
+        let profile_id = self.profile_id.clone();
+        let updating_ids: HashSet<String> =
+            updates.iter().map(|(mod_id, _)| mod_id.clone()).collect();
+        let updated_count = updates.len();
+        let update_lock = self.update_lock.clone();
+        cx.spawn(async move |this, cx| {
+            let result = cx
+                .background_executor()
+                .spawn(async move {
+                    let _update_guard = update_lock.lock().map_err(|_| {
+                        crate::backend::error::AppError::state("Mod update lock was poisoned")
+                    })?;
+                    let profile =
+                        profile_service::get_profile_by_id(&profile_id)?.ok_or_else(|| {
+                            crate::backend::error::AppError::validation(format!(
+                                "Profile '{profile_id}' not found"
+                            ))
+                        })?;
+                    let root_ids: HashSet<String> =
+                        updates.iter().map(|(mod_id, _)| mod_id.clone()).collect();
+                    let mut planned_ids = root_ids.clone();
+                    let mut items = Vec::new();
+
+                    // Resolve every root before appending roots themselves, so
+                    // the combined batch remains dependencies-first.
+                    for (mod_id, latest) in &updates {
+                        let version_info = api::fetch_mod_version_info(mod_id, latest)?;
+                        let (dependencies, unresolved) =
+                            mod_install_service::resolve_required_dependencies_excluding(
+                                &version_info.dependencies,
+                                &root_ids,
+                            )?;
+                        if !unresolved.is_empty() {
+                            return Err(crate::backend::error::AppError::validation(format!(
+                                "Could not resolve dependencies: {}",
+                                unresolved.join(", ")
+                            )));
+                        }
+                        for dependency in dependencies {
+                            if !planned_ids.insert(dependency.mod_id.clone()) {
+                                continue;
+                            }
+                            let already_current = profile.mods.iter().any(|installed| {
+                                installed.mod_id == dependency.mod_id
+                                    && installed.version == dependency.resolved_version
+                            });
+                            if !already_current {
+                                items.push(InstallModInput {
+                                    mod_id: dependency.mod_id,
+                                    version: dependency.resolved_version,
+                                });
+                            }
+                        }
+                    }
+
+                    items.extend(
+                        updates
+                            .into_iter()
+                            .map(|(mod_id, version)| InstallModInput { mod_id, version }),
+                    );
+                    mod_install_service::install_mods_for_profile(&profile_id, &items)?;
+                    Ok::<(), crate::backend::error::AppError>(())
+                })
+                .await;
+            let _ = this.update(cx, |this, cx| {
+                for mod_id in &updating_ids {
+                    this.updating_mods.remove(mod_id);
+                }
+                match result {
+                    Ok(()) => {
+                        this.notice = Some(if updated_count == 1 {
+                            t!("profile.updated_one_mod").to_string()
+                        } else {
+                            t!("profile.updated_mods", count = updated_count).to_string()
+                        });
+                    }
+                    Err(e) => {
+                        warn!("update mods failed: {e}");
+                        this.launch_error =
+                            Some(t!("profile.update_mods_failed", error = e).to_string());
+                    }
+                }
+                cx.notify();
+                this.spawn_load(cx);
             });
         })
         .detach();
@@ -1152,6 +1267,19 @@ impl LibraryDetailView {
         cx: &mut Context<Self>,
     ) -> AnyElement {
         let mod_names = self.mod_names.clone();
+        let latest_versions = self.mod_latest_versions.clone();
+        let updates: Vec<(String, String)> = profile
+            .mods
+            .iter()
+            .filter_map(|installed| {
+                latest_versions.get(&installed.mod_id).and_then(|latest| {
+                    mod_catalog_cache::is_version_outdated(&installed.version, latest)
+                        .then(|| (installed.mod_id.clone(), latest.clone()))
+                })
+            })
+            .collect();
+        let outdated_count = updates.len();
+        let updating_all = !self.updating_mods.is_empty();
         {
             let entries: Vec<AnyElement> = profile
                 .mods
@@ -1169,6 +1297,11 @@ impl LibraryDetailView {
                     let mod_id = m.mod_id.clone();
                     let enabled = m.enabled;
                     let has_file = m.file.is_some();
+                    let updating = self.updating_mods.contains(&m.mod_id);
+                    let latest_version = latest_versions
+                        .get(&m.mod_id)
+                        .filter(|latest| mod_catalog_cache::is_version_outdated(&m.version, latest))
+                        .cloned();
                     // Custom mods have no catalog entry, so no thumbnail to
                     // fetch — they fall back to the placeholder icon.
                     let thumbnail = Avatar::new()
@@ -1183,6 +1316,30 @@ impl LibraryDetailView {
                     } else {
                         m.version.clone()
                     };
+                    let version: AnyElement = match latest_version.as_ref() {
+                        Some(latest) => div()
+                            .flex()
+                            .items_center()
+                            .gap_1()
+                            .flex_none()
+                            .text_sm()
+                            .text_color(theme.text_muted)
+                            .child(version_label)
+                            .child(Icon::new(IconName::ArrowRight).xsmall())
+                            .child(
+                                div()
+                                    .font_weight(FontWeight::MEDIUM)
+                                    .text_color(name_color)
+                                    .child(latest.clone()),
+                            )
+                            .into_any_element(),
+                        None => div()
+                            .flex_none()
+                            .text_sm()
+                            .text_color(theme.text_muted)
+                            .child(version_label)
+                            .into_any_element(),
+                    };
                     let mut row = div().flex().items_center().gap_3().px_3().py_2().hover({
                         let hover_bg = theme.hover;
                         move |s| s.bg(hover_bg)
@@ -1195,22 +1352,42 @@ impl LibraryDetailView {
                             div()
                                 .min_w_0()
                                 .flex_1()
-                                .truncate()
-                                .font_weight(FontWeight::MEDIUM)
-                                .text_color(name_color)
-                                .child(display),
+                                .flex()
+                                .items_center()
+                                .gap_2()
+                                .child(
+                                    div()
+                                        .min_w_0()
+                                        .flex_1()
+                                        .truncate()
+                                        .font_weight(FontWeight::MEDIUM)
+                                        .text_color(name_color)
+                                        .child(display),
+                                ),
                         )
-                        .child(
-                            div()
-                                .text_sm()
-                                .text_color(theme.text_muted)
-                                .child(version_label),
-                        )
+                        .child(version)
+                        .children(latest_version.map(|latest| {
+                            let mod_id = mod_id.clone();
+                            Button::new(SharedString::from(format!("mod-update-{ix}")))
+                                .ghost()
+                                .small()
+                                .icon(Icon::new(AppIcon::Download))
+                                .label(if updating {
+                                    t!("profile.updating_mod")
+                                } else {
+                                    t!("profile.update_mod")
+                                })
+                                .disabled(updating)
+                                .on_click(cx.listener(move |this, _, _window, cx| {
+                                    this.update_mods(vec![(mod_id.clone(), latest.clone())], cx)
+                                }))
+                        }))
                         // Mods imported without a known filename can't be toggled on disk.
                         .children(has_file.then(|| {
                             let mod_id = mod_id.clone();
                             Switch::new(SharedString::from(format!("mod-toggle-{ix}")))
                                 .checked(enabled)
+                                .disabled(updating)
                                 .on_click(cx.listener(move |this, checked: &bool, _window, cx| {
                                     this.toggle_mod(mod_id.clone(), *checked, cx)
                                 }))
@@ -1219,6 +1396,7 @@ impl LibraryDetailView {
                             Button::new(SharedString::from(format!("mod-delete-{ix}")))
                                 .ghost()
                                 .icon(Icon::new(IconName::Delete))
+                                .disabled(updating)
                                 .on_click(cx.listener(move |this, _, window, cx| {
                                     this.confirm_delete_mod(
                                         mod_id.clone(),
@@ -1260,6 +1438,22 @@ impl LibraryDetailView {
                             div()
                                 .flex()
                                 .gap_2()
+                                .children((outdated_count > 0).then(|| {
+                                    let updates = updates.clone();
+                                    Button::new("update-all-mods")
+                                        .primary()
+                                        .icon(Icon::new(AppIcon::Download))
+                                        .label(if updating_all {
+                                            t!("profile.updating_all_mods").to_string()
+                                        } else {
+                                            t!("profile.update_all_mods", count = outdated_count,)
+                                                .to_string()
+                                        })
+                                        .disabled(updating_all)
+                                        .on_click(cx.listener(move |this, _, _window, cx| {
+                                            this.update_mods(updates.clone(), cx)
+                                        }))
+                                }))
                                 .child(
                                     Button::new("install-mods")
                                         .icon(Icon::new(AppIcon::Compass))
