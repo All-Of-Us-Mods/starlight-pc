@@ -118,7 +118,7 @@ pub fn install_bepinex(
                 target_type,
                 target_id,
             );
-            let mut last_extract_percent = None;
+            let mut last_extract_percent = Some(0);
             extract_zip(cache_file, dest, |cur, total| {
                 emit_extract_progress(
                     cur,
