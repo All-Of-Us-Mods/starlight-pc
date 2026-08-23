@@ -39,20 +39,37 @@ fn emit(
     ));
 }
 
-/// `download_file` progress callback: emit a "downloading" event with the
-/// percent computed once. No-op until the total size is known.
+/// Return the current whole percent only when it differs from the last one
+/// emitted. Download callbacks run once per 64 KiB chunk and ZIP extraction
+/// callbacks run once per entry, so publishing every callback can keep the UI
+/// event loop busy long enough that the progress bar does not repaint.
+fn changed_percent(current: u64, total: u64, last_emitted: &mut Option<u8>) -> Option<u8> {
+    if total == 0 {
+        return None;
+    }
+
+    let percent = ((current.saturating_mul(100) / total).min(100)) as u8;
+    if *last_emitted == Some(percent) {
+        return None;
+    }
+    *last_emitted = Some(percent);
+    Some(percent)
+}
+
+/// `download_file` progress callback: emit at most once per whole percentage
+/// point. No-op until the total size is known.
 fn emit_download_progress(
     downloaded: u64,
     total: Option<u64>,
     target_type: BepInExTargetType,
     target_id: &str,
+    last_emitted: &mut Option<u8>,
 ) {
-    if let Some(total) = total {
-        let pct = downloaded as f64 / total as f64 * 100.0;
+    if let Some(pct) = total.and_then(|total| changed_percent(downloaded, total, last_emitted)) {
         emit(
             "downloading",
-            pct,
-            &format!("Downloading... {pct:.0}%"),
+            f64::from(pct),
+            &format!("Downloading... {pct}%"),
             target_type,
             target_id,
         );
@@ -66,10 +83,14 @@ fn emit_extract_progress(
     total: usize,
     target_type: BepInExTargetType,
     target_id: &str,
+    last_emitted: &mut Option<u8>,
 ) {
+    let Some(pct) = changed_percent(current as u64, total as u64, last_emitted) else {
+        return;
+    };
     emit(
         "extracting",
-        current as f64 / total as f64 * 100.0,
+        f64::from(pct),
         &format!("Extracting {current}/{total}"),
         target_type,
         target_id,
@@ -97,8 +118,15 @@ pub fn install_bepinex(
                 target_type,
                 target_id,
             );
+            let mut last_extract_percent = None;
             extract_zip(cache_file, dest, |cur, total| {
-                emit_extract_progress(cur, total, target_type, target_id)
+                emit_extract_progress(
+                    cur,
+                    total,
+                    target_type,
+                    target_id,
+                    &mut last_extract_percent,
+                )
             })?;
             emit("complete", 100.0, "Complete!", target_type, target_id);
             return Ok(());
@@ -107,8 +135,15 @@ pub fn install_bepinex(
 
     let temp = dest.with_extension("zip.tmp");
     emit("downloading", 0.0, "Downloading...", target_type, target_id);
+    let mut last_download_percent = Some(0);
     download_file(&url, &temp, None, None, |dl, total| {
-        emit_download_progress(dl, total, target_type, target_id)
+        emit_download_progress(
+            dl,
+            total,
+            target_type,
+            target_id,
+            &mut last_download_percent,
+        )
     })?;
 
     if let Some(ref cache) = cache_path {
@@ -124,8 +159,15 @@ pub fn install_bepinex(
     }
 
     emit("extracting", 0.0, "Extracting...", target_type, target_id);
+    let mut last_extract_percent = Some(0);
     extract_zip(&temp, dest, |cur, total| {
-        emit_extract_progress(cur, total, target_type, target_id)
+        emit_extract_progress(
+            cur,
+            total,
+            target_type,
+            target_id,
+            &mut last_extract_percent,
+        )
     })?;
 
     fs::remove_file(&temp).ok();
@@ -147,8 +189,15 @@ pub fn download_bepinex_to_cache(
         BepInExTargetType::Cache,
         &architecture,
     );
+    let mut last_download_percent = Some(0);
     download_file(&url, cache_file, None, None, |dl, total| {
-        emit_download_progress(dl, total, BepInExTargetType::Cache, &architecture)
+        emit_download_progress(
+            dl,
+            total,
+            BepInExTargetType::Cache,
+            &architecture,
+            &mut last_download_percent,
+        )
     })?;
 
     emit(
@@ -178,4 +227,28 @@ pub fn clear_cache(cache_path: String, architecture: String) -> AppResult<()> {
 
 pub fn cache_size(cache_path: &str) -> Option<u64> {
     fs::metadata(cache_path).ok().map(|m| m.len())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::changed_percent;
+
+    #[test]
+    fn progress_is_emitted_once_per_whole_percent() {
+        let mut last = Some(0);
+
+        assert_eq!(changed_percent(11, 100, &mut last), Some(11));
+        assert_eq!(changed_percent(119, 1000, &mut last), None);
+        assert_eq!(changed_percent(120, 1000, &mut last), Some(12));
+        assert_eq!(changed_percent(1_500, 1_000, &mut last), Some(100));
+        assert_eq!(changed_percent(2_000, 1_000, &mut last), None);
+    }
+
+    #[test]
+    fn progress_ignores_an_unknown_zero_total() {
+        let mut last = None;
+
+        assert_eq!(changed_percent(64, 0, &mut last), None);
+        assert_eq!(last, None);
+    }
 }
