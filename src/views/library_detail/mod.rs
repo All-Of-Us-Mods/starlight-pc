@@ -365,9 +365,8 @@ impl LibraryDetailView {
                                 "Profile '{profile_id}' not found"
                             ))
                         })?;
-                    let root_ids: HashSet<String> =
-                        updates.iter().map(|(mod_id, _)| mod_id.clone()).collect();
-                    let mut planned_ids = root_ids.clone();
+                    let root_versions: HashMap<String, String> = updates.iter().cloned().collect();
+                    let mut planned_ids: HashSet<String> = root_versions.keys().cloned().collect();
                     let mut items = Vec::new();
 
                     // Resolve every root before appending roots themselves, so
@@ -375,9 +374,9 @@ impl LibraryDetailView {
                     for (mod_id, latest) in &updates {
                         let version_info = api::fetch_mod_version_info(mod_id, latest)?;
                         let (dependencies, unresolved) =
-                            mod_install_service::resolve_required_dependencies_excluding(
+                            mod_install_service::resolve_required_dependencies_with_pins(
                                 &version_info.dependencies,
-                                &root_ids,
+                                &root_versions,
                             )?;
                         if !unresolved.is_empty() {
                             return Err(crate::backend::error::AppError::validation(format!(
@@ -389,10 +388,21 @@ impl LibraryDetailView {
                             if !planned_ids.insert(dependency.mod_id.clone()) {
                                 continue;
                             }
-                            let already_current = profile.mods.iter().any(|installed| {
-                                installed.mod_id == dependency.mod_id
-                                    && installed.version == dependency.resolved_version
+                            let installed = profile
+                                .mods
+                                .iter()
+                                .find(|installed| installed.mod_id == dependency.mod_id);
+                            let already_current = installed.is_some_and(|installed| {
+                                installed.version == dependency.resolved_version
                             });
+                            if !already_current
+                                && installed.is_some_and(|installed| !installed.enabled)
+                            {
+                                return Err(crate::backend::error::AppError::validation(format!(
+                                    "Enable '{}' before updating; it is a required dependency",
+                                    dependency.mod_name
+                                )));
+                            }
                             if !already_current {
                                 items.push(InstallModInput {
                                     mod_id: dependency.mod_id,
@@ -1272,6 +1282,9 @@ impl LibraryDetailView {
             .mods
             .iter()
             .filter_map(|installed| {
+                if !installed.enabled {
+                    return None;
+                }
                 latest_versions.get(&installed.mod_id).and_then(|latest| {
                     mod_catalog_cache::is_version_outdated(&installed.version, latest)
                         .then(|| (installed.mod_id.clone(), latest.clone()))
@@ -1300,7 +1313,9 @@ impl LibraryDetailView {
                     let updating = self.updating_mods.contains(&m.mod_id);
                     let latest_version = latest_versions
                         .get(&m.mod_id)
-                        .filter(|latest| mod_catalog_cache::is_version_outdated(&m.version, latest))
+                        .filter(|latest| {
+                            m.enabled && mod_catalog_cache::is_version_outdated(&m.version, latest)
+                        })
                         .cloned();
                     // Custom mods have no catalog entry, so no thumbnail to
                     // fetch — they fall back to the placeholder icon.

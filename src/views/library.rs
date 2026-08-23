@@ -142,7 +142,7 @@ impl LibraryView {
         let mod_ids: HashSet<String> = profiles
             .iter()
             .flat_map(|profile| &profile.mods)
-            .filter(|installed| !installed.is_custom())
+            .filter(|installed| installed.enabled && !installed.is_custom())
             .map(|installed| installed.mod_id.clone())
             .collect();
         if mod_ids.is_empty() {
@@ -510,6 +510,7 @@ impl LibraryView {
         let outdated_count = profile
             .mods
             .iter()
+            .filter(|installed| installed.enabled)
             .filter(|installed| {
                 self.latest_mod_versions
                     .get(&installed.mod_id)
