@@ -6,6 +6,7 @@ use gpui_component::{
     button::{Button, ButtonVariants},
     input::{Input, InputEvent, InputState},
     notification::Notification,
+    scroll::ScrollableElement as _,
     setting::{SettingField, SettingGroup, SettingItem, SettingPage, Settings},
 };
 use log::warn;
@@ -15,7 +16,7 @@ use crate::backend::events::{self, BackendEvent};
 use crate::backend::services::core_service::LinuxRunnerKind;
 use crate::backend::services::{
     bepinex_service::{self, BepInExTargetType},
-    core_service::{self, AppSettingsPatch, GamePlatform},
+    core_service::{self, AppSettingsPatch, GamePlatform, ScrollbarVisibility},
     finder_service,
 };
 use crate::settings as app_settings;
@@ -236,6 +237,23 @@ fn patch_show_stars_background(value: bool, cx: &mut App) {
         },
     );
     // The stars layer lives in the workspace, which doesn't observe settings.
+    cx.refresh_windows();
+}
+
+fn patch_scrollbar_visibility(value: SharedString, cx: &mut App) {
+    let visibility = match value.as_ref() {
+        "hover" => ScrollbarVisibility::Hover,
+        "always" => ScrollbarVisibility::Always,
+        _ => ScrollbarVisibility::Scrolling,
+    };
+    app_settings::update(
+        cx,
+        AppSettingsPatch {
+            scrollbar_visibility: Some(visibility),
+            ..Default::default()
+        },
+    );
+    crate::theme::apply_scrollbar_visibility(cx);
     cx.refresh_windows();
 }
 
@@ -692,15 +710,6 @@ impl Render for SettingsView {
         let appearance_page = SettingPage::new(t!("settings.page.appearance")).group(
             SettingGroup::new().title(t!("settings.group.theme")).items(vec![
                 SettingItem::new(
-                    t!("settings.theme"),
-                    SettingField::scrollable_dropdown(
-                        theme_options,
-                        |cx| app_settings::get(cx).theme_name.clone().into(),
-                        patch_theme_name,
-                    ),
-                )
-                .description(t!("settings.theme_desc").to_string()),
-                SettingItem::new(
                     t!("settings.language"),
                     SettingField::dropdown(
                         language_options,
@@ -709,34 +718,41 @@ impl Render for SettingsView {
                     ),
                 )
                 .description(t!("settings.language_desc").to_string()),
-                stacked_item(
-                    t!("settings.themes_folder"),
-                    SettingField::render(|_, _, _| {
-                        div()
-                            .flex()
-                            .flex_wrap()
-                            .gap_2()
-                            .child(
-                                Button::new("open-themes-folder")
-                                    .icon(Icon::new(IconName::FolderOpen))
-                                    .label(t!("settings.open_themes_folder"))
-                                    .on_click(|_, _, _| {
-                                        open_in_file_manager(&crate::theme::themes_dir())
-                                    }),
-                            )
-                            .child(
-                                Button::new("browse-themes")
-                                    .icon(Icon::new(IconName::ExternalLink))
-                                    .label(t!("settings.browse_themes"))
-                                    .on_click(|_, _, cx| {
-                                        cx.open_url(
-                                            "https://github.com/longbridge/gpui-component/tree/main/themes",
-                                        )
-                                    }),
-                            )
-                    }),
+                SettingItem::new(
+                    t!("settings.theme"),
+                    SettingField::scrollable_dropdown(
+                        theme_options,
+                        |cx| app_settings::get(cx).theme_name.clone().into(),
+                        patch_theme_name,
+                    ),
                 )
-                .description(t!("settings.themes_folder_desc").to_string()),
+                .description(t!("settings.theme_desc").to_string()),
+                // Sits right under the theme dropdown rather than in a titled row of
+                // its own: both buttons are about where themes come from.
+                SettingItem::render(|_, _, _| {
+                    div()
+                        .flex()
+                        .flex_wrap()
+                        .gap_2()
+                        .child(
+                            Button::new("open-themes-folder")
+                                .icon(Icon::new(IconName::FolderOpen))
+                                .label(t!("settings.open_themes_folder"))
+                                .on_click(|_, _, _| {
+                                    open_in_file_manager(&crate::theme::themes_dir())
+                                }),
+                        )
+                        .child(
+                            Button::new("browse-themes")
+                                .icon(Icon::new(IconName::ExternalLink))
+                                .label(t!("settings.browse_themes"))
+                                .on_click(|_, _, cx| {
+                                    cx.open_url(
+                                        "https://github.com/longbridge/gpui-component/tree/main/themes",
+                                    )
+                                }),
+                        )
+                }),
                 SettingItem::new(
                     t!("settings.stars_background"),
                     SettingField::switch(
@@ -745,6 +761,23 @@ impl Render for SettingsView {
                     ),
                 )
                 .description(t!("settings.stars_background_desc").to_string()),
+                SettingItem::new(
+                    t!("settings.scrollbars"),
+                    SettingField::dropdown(
+                        vec![
+                            ("scrolling".into(), t!("settings.scrollbars_scrolling").to_string().into()),
+                            ("hover".into(), t!("settings.scrollbars_hover").to_string().into()),
+                            ("always".into(), t!("settings.scrollbars_always").to_string().into()),
+                        ],
+                        |cx| match app_settings::get(cx).scrollbar_visibility {
+                            ScrollbarVisibility::Scrolling => "scrolling".into(),
+                            ScrollbarVisibility::Hover => "hover".into(),
+                            ScrollbarVisibility::Always => "always".into(),
+                        },
+                        patch_scrollbar_visibility,
+                    ),
+                )
+                .description(t!("settings.scrollbars_desc").to_string()),
             ]));
 
         let bepinex_page = SettingPage::new(t!("settings.page.bepinex")).groups(vec![
@@ -977,7 +1010,7 @@ impl Render for SettingsView {
             ]));
 
         crate::views::page_root("settings-page", &theme)
-            .overflow_y_scroll()
+            .overflow_y_scrollbar()
             .gap_4()
             .child(
                 div()

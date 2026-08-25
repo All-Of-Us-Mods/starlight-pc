@@ -1,5 +1,6 @@
 use chrono::{DateTime, Local};
 use gpui::*;
+use gpui_component::scroll::ScrollableElement as _;
 use gpui_component::separator::Separator;
 use gpui_component::text::TextView;
 use rust_i18n::t;
@@ -34,7 +35,7 @@ impl Render for NewsDetailView {
         let theme = cx.theme().clone();
 
         page_root("news-detail-page", &theme)
-            .overflow_y_scroll()
+            .overflow_y_scrollbar()
             .gap_6()
             .child(
                 div()

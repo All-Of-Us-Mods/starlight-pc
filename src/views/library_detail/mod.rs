@@ -39,6 +39,7 @@ use gpui_component::button::{Button, ButtonVariant, ButtonVariants};
 use gpui_component::dialog::{DialogAction, DialogButtonProps, DialogClose, DialogFooter};
 use gpui_component::input::{Input, InputEvent, InputState};
 use gpui_component::progress::Progress;
+use gpui_component::scroll::ScrollableElement as _;
 use gpui_component::skeleton::Skeleton;
 use gpui_component::switch::Switch;
 use gpui_component::{Disableable, Icon, IconName, Sizable, WindowExt};
@@ -924,7 +925,6 @@ impl Render for LibraryDetailView {
 
         page_root("library-detail-page", &theme)
             .gap_4()
-            .overflow_y_scroll()
             // Dropping plugin .dlls anywhere on the page adds them to this profile.
             .drag_over::<ExternalPaths>({
                 let hover = theme.hover;
@@ -933,6 +933,9 @@ impl Render for LibraryDetailView {
             .on_drop(cx.listener(|this, dropped: &ExternalPaths, _window, cx| {
                 this.on_drop(dropped.paths(), cx);
             }))
+            // Chained after the drop handlers: the scrollbar wrapper is no
+            // longer a stateful element, so `on_drop` has to come first.
+            .overflow_y_scrollbar()
             .children(self.export_progress.map(|p| {
                 div()
                     .flex()

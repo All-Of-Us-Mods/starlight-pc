@@ -6,6 +6,7 @@ use crate::theme::ThemeExt;
 use crate::ui::mod_card;
 use gpui_component::alert::Alert;
 use gpui_component::button::Button;
+use gpui_component::scroll::ScrollableElement as _;
 use gpui_component::skeleton::Skeleton;
 
 #[derive(Clone, Debug)]
@@ -101,7 +102,7 @@ fn carousel(id: &'static str, items: Vec<AnyElement>) -> impl IntoElement {
         .id(id)
         .flex()
         .gap_3()
-        .overflow_x_scroll()
+        .overflow_x_scrollbar()
         .pb_2()
         .children(items)
 }
@@ -220,7 +221,7 @@ impl Render for HomeView {
         };
 
         crate::views::page_root("home-page", &theme)
-            .overflow_y_scroll()
+            .overflow_y_scrollbar()
             .gap_8()
             .child(
                 div()

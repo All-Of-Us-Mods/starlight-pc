@@ -8,6 +8,7 @@ use gpui_component::avatar::Avatar;
 use gpui_component::button::{Button, ButtonVariants};
 use gpui_component::dialog::{DialogAction, DialogClose, DialogFooter};
 use gpui_component::radio::Radio;
+use gpui_component::scroll::ScrollableElement as _;
 use gpui_component::tab::TabBar;
 use gpui_component::{Icon, IconName, Sizable as _, WindowExt};
 use rust_i18n::t;
@@ -388,7 +389,7 @@ fn icon_dialog_body(view: &Entity<LibraryDetailView>, cx: &App) -> AnyElement {
                 div()
                     .id("icon-mod-list")
                     .max_h(px(240.0))
-                    .overflow_y_scroll()
+                    .overflow_y_scrollbar()
                     .flex()
                     .flex_col()
                     .gap_1()

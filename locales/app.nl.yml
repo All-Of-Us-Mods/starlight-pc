@@ -295,12 +295,15 @@ settings:
   theme_desc: Plaats gpui-component-thema-JSON-bestanden in de themamap om je eigen thema's toe te voegen.
   language: Taal
   language_desc: UI-taal voor Starlight en de bijbehorende onderdelen.
-  themes_folder: Themamap
   open_themes_folder: Themamap openen
   browse_themes: Thema's bekijken
-  themes_folder_desc: Meegeleverde Starlight-thema's worden bij elke start opnieuw geschreven. Kopieer een thema naar een nieuw bestand voordat je het bewerkt.
   stars_background: Zwevende sterrenachtergrond
   stars_background_desc: Toon het langzaam bewegende sterrenveld achter de pagina's.
+  scrollbars: Scrollbars
+  scrollbars_desc: Wanneer de scrollbars zichtbaar zijn.
+  scrollbars_scrolling: Tijdens scrollen
+  scrollbars_hover: Bij aanwijzen
+  scrollbars_always: Altijd
   cache_downloads: BepInEx-downloads cachen
   cache_downloads_desc: Hergebruik gecachte archieven voor meerdere profielinstallaties.
   cache:

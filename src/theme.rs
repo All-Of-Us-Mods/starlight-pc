@@ -14,8 +14,12 @@ use std::path::{Path, PathBuf};
 use std::rc::Rc;
 
 use gpui::*;
-use gpui_component::{Theme as ComponentTheme, ThemeColor, ThemeConfig, ThemeRegistry};
+use gpui_component::{
+    Theme as ComponentTheme, ThemeColor, ThemeConfig, ThemeRegistry, scroll::ScrollbarMode,
+};
 use log::warn;
+
+use crate::backend::services::core_service::ScrollbarVisibility;
 
 /// Starlight's own themes, written into the themes directory on startup.
 const BUNDLED_THEMES: &str = include_str!("../assets/themes/starlight.json");
@@ -97,6 +101,7 @@ pub fn init(cx: &mut App) {
         warn!("failed to load bundled themes: {e}");
     }
     apply_saved(cx);
+    apply_scrollbar_visibility(cx);
 
     // Every registry change (initial directory load, or a file edited while
     // the app runs) re-applies the selected theme.
@@ -162,7 +167,21 @@ fn finish_apply(cx: &mut App, config: &Rc<ThemeConfig>) {
 
     let palette = Theme::from_colors(&theme.colors);
     cx.set_global(palette);
+    // Scrollbars paint from gpui-component's Base layer, which keeps its own copy
+    // of the theme; `apply_config` alone leaves it on the previous palette.
+    ComponentTheme::sync_base(cx);
     cx.refresh_windows();
+}
+
+/// Push the saved scrollbar visibility down to gpui-component, which owns the
+/// overlay scrollbars every scrolling view renders.
+pub fn apply_scrollbar_visibility(cx: &mut App) {
+    let mode = match crate::settings::get(cx).scrollbar_visibility {
+        ScrollbarVisibility::Scrolling => ScrollbarMode::Scrolling,
+        ScrollbarVisibility::Hover => ScrollbarMode::Hover,
+        ScrollbarVisibility::Always => ScrollbarMode::Always,
+    };
+    ComponentTheme::set_scrollbar_mode(mode, cx);
 }
 
 pub const FONT_FAMILY: &str = ".SystemUIFont";

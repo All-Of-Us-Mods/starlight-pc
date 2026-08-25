@@ -295,12 +295,15 @@ settings:
   theme_desc: 將 gpui-component 主題 JSON 檔案放入 themes 資料夾以新增自定義主題。
   language: 語言
   language_desc: Starlight 及其元件的介面語言。
-  themes_folder: 主題資料夾
   open_themes_folder: 開啟主題資料夾
   browse_themes: 瀏覽主題
-  themes_folder_desc: 內建 Starlight 主題會在每次啟動時被覆寫，編輯前請先複製一份至新檔案。
   stars_background: 浮動星空背景
   stars_background_desc: 在頁面後方顯示緩慢漂移的星空。
+  # MISSING: scrollbars
+  # MISSING: scrollbars_desc
+  # MISSING: scrollbars_scrolling
+  # MISSING: scrollbars_hover
+  # MISSING: scrollbars_always
   cache_downloads: 快取 BepInEx 下載
   cache_downloads_desc: 在不同設定檔安裝之間重複使用快取的壓縮檔。
   cache:

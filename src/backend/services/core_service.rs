@@ -56,6 +56,19 @@ impl BepInExArch {
     }
 }
 
+/// When the overlay scrollbars are visible.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum ScrollbarVisibility {
+    /// Fades in while scrolling, then out again.
+    #[default]
+    Scrolling,
+    /// Visible while the pointer is over the scrolling area.
+    Hover,
+    /// Always visible.
+    Always,
+}
+
 fn default_true() -> bool {
     true
 }
@@ -123,6 +136,9 @@ pub struct AppSettings {
     pub language: String,
     #[serde(default = "default_true")]
     pub show_stars_background: bool,
+    /// When overlay scrollbars fade in.
+    #[serde(default)]
+    pub scrollbar_visibility: ScrollbarVisibility,
     /// Width the user dragged the sidebar to; drives icon mode when small.
     #[serde(default = "default_sidebar_width")]
     pub sidebar_width: f32,
@@ -149,6 +165,7 @@ impl Default for AppSettings {
             theme_name: default_theme_name(),
             language: default_language(),
             show_stars_background: true,
+            scrollbar_visibility: ScrollbarVisibility::default(),
             sidebar_width: default_sidebar_width(),
         }
     }
@@ -174,6 +191,7 @@ pub struct AppSettingsPatch {
     pub theme_name: Option<String>,
     pub language: Option<String>,
     pub show_stars_background: Option<bool>,
+    pub scrollbar_visibility: Option<ScrollbarVisibility>,
     pub sidebar_width: Option<f32>,
 }
 
@@ -363,6 +381,9 @@ pub fn update_settings(patch: AppSettingsPatch) -> AppResult<AppSettings> {
     }
     if let Some(value) = patch.show_stars_background {
         settings.show_stars_background = value;
+    }
+    if let Some(value) = patch.scrollbar_visibility {
+        settings.scrollbar_visibility = value;
     }
     if let Some(value) = patch.sidebar_width {
         settings.sidebar_width = value;

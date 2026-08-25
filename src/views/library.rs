@@ -21,6 +21,7 @@ use gpui_component::button::{Button, ButtonVariants};
 use gpui_component::dialog::{DialogAction, DialogClose, DialogFooter};
 use gpui_component::input::{Input, InputEvent, InputState};
 use gpui_component::progress::Progress;
+use gpui_component::scroll::ScrollableElement as _;
 use gpui_component::skeleton::Skeleton;
 use gpui_component::{Disableable, Icon, IconName, WindowExt};
 
@@ -677,7 +678,6 @@ impl Render for LibraryView {
 
         crate::views::page_root("library-page", &theme)
             .relative()
-            .overflow_y_scroll()
             // Dropping an exported profile .zip anywhere on the page imports it.
             // Cards handle their own drops first (the listener consumes the drag).
             .drag_over::<ExternalPaths>({
@@ -687,6 +687,9 @@ impl Render for LibraryView {
             .on_drop(cx.listener(|this, dropped: &ExternalPaths, _window, cx| {
                 this.on_drop_on_page(dropped.paths(), cx);
             }))
+            // Chained after the drop handlers: the scrollbar wrapper is no
+            // longer a stateful element, so `on_drop` has to come first.
+            .overflow_y_scrollbar()
             .child(self.render_header(cx))
             .children(setup_banner)
             .children(self.error.clone().map(|message| {
