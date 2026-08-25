@@ -15,6 +15,7 @@ use gpui_component::checkbox::Checkbox;
 use gpui_component::dialog::{DialogAction, DialogClose, DialogFooter};
 use gpui_component::form::{field, v_form};
 use gpui_component::input::{Input, InputEvent, InputState};
+use gpui_component::scroll::ScrollableElement as _;
 use gpui_component::skeleton::Skeleton;
 use gpui_component::{Icon, IconName, Sizable, WindowExt};
 
@@ -715,7 +716,7 @@ impl Render for ServersView {
 
         page_root("servers-page", &theme)
             .relative()
-            .overflow_y_scroll()
+            .overflow_y_scrollbar()
             .gap_6()
             .child(
                 div()

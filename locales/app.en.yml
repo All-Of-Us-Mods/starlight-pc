@@ -295,12 +295,15 @@ settings:
   theme_desc: Drop gpui-component theme JSON files into the themes folder to add your own.
   language: Language
   language_desc: UI language for Starlight and its components.
-  themes_folder: Themes folder
   open_themes_folder: Open Themes Folder
   browse_themes: Browse Themes
-  themes_folder_desc: Bundled Starlight themes are rewritten on every launch, copy one to a new file before editing it.
   stars_background: Floating stars background
   stars_background_desc: Show the slowly drifting starfield behind pages.
+  scrollbars: Scrollbars
+  scrollbars_desc: When the overlay scrollbars are visible.
+  scrollbars_scrolling: While scrolling
+  scrollbars_hover: On hover
+  scrollbars_always: Always
   cache_downloads: Cache BepInEx downloads
   cache_downloads_desc: Reuse cached archives across profile installs.
   cache:

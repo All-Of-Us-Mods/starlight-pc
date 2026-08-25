@@ -7,6 +7,7 @@ use gpui_component::{
     input::{Input, InputState},
     notification::Notification,
     progress::Progress,
+    scroll::ScrollableElement as _,
     separator::Separator,
     skeleton::Skeleton,
     tag::Tag,
@@ -772,7 +773,7 @@ impl Render for ModDetailView {
 
         page_root("mod-detail-page", &theme)
             .gap_4()
-            .overflow_y_scroll()
+            .overflow_y_scrollbar()
             .child(body)
     }
 }

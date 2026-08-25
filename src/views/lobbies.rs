@@ -26,6 +26,7 @@ use gpui_component::button::{Button, ButtonVariants};
 use gpui_component::clipboard::Clipboard;
 use gpui_component::dialog::{DialogAction, DialogClose, DialogFooter};
 use gpui_component::radio::Radio;
+use gpui_component::scroll::ScrollableElement as _;
 use gpui_component::skeleton::Skeleton;
 use gpui_component::tag::Tag;
 use gpui_component::{Disableable, Icon, IconName, Sizable, WindowExt};
@@ -777,7 +778,7 @@ fn launch_dialog_body(view: &Entity<LobbiesView>, cx: &App) -> AnyElement {
             .flex_col()
             .gap_2()
             .max_h(px(220.0))
-            .overflow_y_scroll()
+            .overflow_y_scrollbar()
             .children(option_rows)
             .into_any_element(),
     ];
@@ -908,7 +909,7 @@ impl Render for LobbiesView {
 
         page_root("lobbies-page", &theme)
             .relative()
-            .overflow_y_scroll()
+            .overflow_y_scrollbar()
             .gap_6()
             .child(
                 div()

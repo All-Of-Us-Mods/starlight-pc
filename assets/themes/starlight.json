@@ -5,7 +5,7 @@
     {
       "name": "Starlight",
       "mode": "dark",
-      "is_default": true,
+      "is_default": false,
       "colors": {
         "background": "#000000",
         "foreground": "#fafafa",
@@ -157,7 +157,7 @@
     {
       "name": "Starlight Zinc",
       "mode": "dark",
-      "is_default": false,
+      "is_default": true,
       "colors": {
         "background": "#09090b",
         "foreground": "#fafafa",

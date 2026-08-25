@@ -314,12 +314,15 @@ settings:
   theme_desc: أسقط ملفات JSON الخاصة بسمات gpui-component في مجلد السمات لإضافة سماتك الخاصة.
   language: اللغة
   language_desc: لغة واجهة Starlight ومكوناته.
-  themes_folder: مجلد السمات
   open_themes_folder: فتح مجلد السمات
   browse_themes: استعراض السمات
-  themes_folder_desc: تُعاد كتابة سمات Starlight المضمّنة عند كل تشغيل، لذا انسخ إحداها إلى ملف جديد قبل تعديلها.
   stars_background: خلفية نجوم عائمة
   stars_background_desc: عرض حقل النجوم البطيء الحركة خلف الصفحات.
+  # MISSING: scrollbars
+  # MISSING: scrollbars_desc
+  # MISSING: scrollbars_scrolling
+  # MISSING: scrollbars_hover
+  # MISSING: scrollbars_always
   cache_downloads: تخزين تنزيلات BepInEx مؤقتاً
   cache_downloads_desc: إعادة استخدام الأرشيفات المخزنة مؤقتاً بين عمليات تثبيت الملفات الشخصية.
   cache:
