@@ -26,7 +26,7 @@ const BUNDLED_THEMES: &str = include_str!("../assets/themes/starlight.json");
 const BUNDLED_FILE_NAME: &str = "starlight.json";
 
 /// Theme applied when settings name a theme that isn't installed.
-pub const DEFAULT_THEME_NAME: &str = "Starlight";
+pub const DEFAULT_THEME_NAME: &str = "Starlight Zinc";
 
 #[derive(Clone)]
 pub struct Theme {

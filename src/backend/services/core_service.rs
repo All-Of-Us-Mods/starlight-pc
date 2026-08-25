@@ -81,7 +81,7 @@ fn default_sidebar_width() -> f32 {
 /// Name of the JSON theme applied on startup when settings don't name one.
 /// Themes are resolved by name against `crate::theme`'s registry.
 fn default_theme_name() -> String {
-    "Starlight".to_string()
+    crate::theme::DEFAULT_THEME_NAME.to_string()
 }
 
 /// Locale code used until the user picks a language.
