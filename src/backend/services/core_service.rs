@@ -108,6 +108,7 @@ pub struct AppSettings {
     pub close_on_launch: bool,
     pub allow_multi_instance_launch: bool,
     pub game_platform: GamePlatform,
+    #[serde(default = "default_true")]
     pub cache_bepinex: bool,
     pub xbox_app_id: Option<String>,
     #[serde(default)]
@@ -153,7 +154,7 @@ impl Default for AppSettings {
             close_on_launch: false,
             allow_multi_instance_launch: false,
             game_platform: GamePlatform::Steam,
-            cache_bepinex: false,
+            cache_bepinex: true,
             xbox_app_id: None,
             linux_runner_kind: LinuxRunnerKind::Steam,
             linux_runner_binary: String::new(),
